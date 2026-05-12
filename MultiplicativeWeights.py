@@ -1,5 +1,6 @@
 import math
 import random
+import matplotlib.pyplot as plt
 
 def simulate_mwu(p1_start_chance, p2_start_chance, iterations=1000):
     learning_speed = 0.1
@@ -11,6 +12,7 @@ def simulate_mwu(p1_start_chance, p2_start_chance, iterations=1000):
 
     p2_score_A = math.log(p2_start_chance)
     p2_score_B = math.log(1 - p2_start_chance)
+    plot_history = []
 
     for i in range(iterations):
 
@@ -24,6 +26,7 @@ def simulate_mwu(p1_start_chance, p2_start_chance, iterations=1000):
         p2_confidence_A = math.exp(p2_score_A) / denom2
         p2_confidence_B = 1 - p2_confidence_A
 
+        plot_history.append((p1_confidence_A, p2_confidence_A))
         #calculate rewards
         reward_1_A = 2 * p2_confidence_A
         reward_1_B = 2 * p2_confidence_B
@@ -45,7 +48,8 @@ def simulate_mwu(p1_start_chance, p2_start_chance, iterations=1000):
         p2_score_B += learning_speed * reward_2_B
 
 
-    return round(p1_confidence_A, 2), round(p2_confidence_A, 2)
+    #return p1_confidence_A, p2_confidence_A
+    return plot_history
 
 
 test_scenarios = [
@@ -53,23 +57,39 @@ test_scenarios = [
     (0.4, 0.1), (0.7, 0.1), (0.9, 0.1),
     (0.4, 0.9), (0.7, 0.9), (0.9, 0.9),
     (0.9, 0.4), (0.9, 0.7),
-    (0.45, 0.55), (0.55, 0.45)  # Points near the saddle
+    (0.45, 0.55), (0.55, 0.45)
 ]
 
 
 print(f"{'Starting Confidence':<30} | {'Final Confidence':<20} | Outcome")
 print("-" * 70)
 
-for p1, p2 in test_scenarios:
+"""for p1, p2 in test_scenarios:
     final_p1, final_p2 = simulate_mwu(p1, p2)
+    p1_rounded = round(final_p1, 2)
+    p2_rounded = round(final_p2, 2)
 
-    #print results: readable
-    if final_p1 > 0.5 and final_p2 > 0.5:
-        result = "Both chose A"
-    elif final_p1 < 0.5 and final_p2 < 0.5:
-        result = "Both chose B"
-    else:
-        result = "Confusion"
+    print (f"final p1 {final_p1}, final p2 {final_p2}")
+    print (f"final rounded {p1_rounded}, final rounded {p2_rounded}")"""
 
-    print(
-        f"P1: {p1 * 100:>2}%, P2: {p2 * 100:>2}%{'':<8} | P1: {final_p1 * 100:>3}%, P2: {final_p2 * 100:>3}% | {result}")
+
+#Graphics!
+for p1, p2 in test_scenarios:
+    history = simulate_mwu(p1, p2)
+
+    x = [h[0] for h in history]
+    y = [h[1] for h in history]
+
+    plt.plot(x, y)
+
+
+plt.xlabel("Player 1 confidence in A")
+plt.ylabel("Player 2 confidence in A")
+
+plt.title("Coordination Game, both players using Multiplicative Weights")
+
+plt.xlim(0,1)
+plt.ylim(0,1)
+
+plt.grid(True)
+plt.show()
