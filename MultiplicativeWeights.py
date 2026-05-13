@@ -2,8 +2,7 @@ import math
 import random
 import matplotlib.pyplot as plt
 
-def simulate_mwu(p1_start_chance, p2_start_chance, iterations=1000):
-    learning_speed = 0.1
+def simulate_mwu(p1_start_chance, p2_start_chance, learning_rate=0.1, iterations=1000):
     noise_level = 0.2
 
     #init scores
@@ -12,9 +11,13 @@ def simulate_mwu(p1_start_chance, p2_start_chance, iterations=1000):
 
     p2_score_A = math.log(p2_start_chance)
     p2_score_B = math.log(1 - p2_start_chance)
+
     plot_history = []
 
     for i in range(iterations):
+
+        #robbins monro step size
+        learning_speed = learning_rate / math.sqrt(i + 1)
 
         #confidence p1
         denom1 = math.exp(p1_score_A) + math.exp(p1_score_B)
@@ -27,6 +30,7 @@ def simulate_mwu(p1_start_chance, p2_start_chance, iterations=1000):
         p2_confidence_B = 1 - p2_confidence_A
 
         plot_history.append((p1_confidence_A, p2_confidence_A))
+
         #calculate rewards
         reward_1_A = 2 * p2_confidence_A
         reward_1_B = 2 * p2_confidence_B
@@ -61,8 +65,8 @@ test_scenarios = [
 ]
 
 
-print(f"{'Starting Confidence':<30} | {'Final Confidence':<20} | Outcome")
-print("-" * 70)
+"""print(f"{'Starting Confidence':<30} | {'Final Confidence':<20} | Outcome")
+print("-" * 70)"""
 
 """for p1, p2 in test_scenarios:
     final_p1, final_p2 = simulate_mwu(p1, p2)
@@ -80,7 +84,8 @@ for p1, p2 in test_scenarios:
     x = [h[0] for h in history]
     y = [h[1] for h in history]
 
-    plt.plot(x, y)
+    plt.plot(x, y, color = "navy", linewidth=1)
+    plt.scatter(p1, p2, color='black', s=15, zorder=3)
 
 
 plt.xlabel("Player 1 confidence in A")
@@ -90,6 +95,8 @@ plt.title("Coordination Game, both players using Multiplicative Weights")
 
 plt.xlim(0,1)
 plt.ylim(0,1)
+
+plt.scatter([0.5], [0.5], color='red', s=40)
 
 plt.grid(True)
 plt.show()
