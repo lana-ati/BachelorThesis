@@ -27,11 +27,11 @@ def run_mixed_simulation(p1_start, p2_start, iterations=1000, noise = 0.2):
         # Record the current state of play
         history.append((p1_conf, p2_conf))
 
-        noise_A_1 = random.gauss(0, noise)
-        noise_B_1 = random.gauss(0, noise)
+        noise_A_1 = random.uniform(0, noise)
+        noise_B_1 = random.uniform(0, noise)
 
-        noise_A_2 = random.gauss(0, noise)
-        noise_B_2 = random.gauss(0, noise)
+        noise_A_2 = random.uniform(0, noise)
+        noise_B_2 = random.uniform(0, noise)
 
         # 1. Compute PGD's next move based on MWU's current confidence
         next_p2_conf = pgd_step(p2_conf, p1_conf, learning_speed, noise_A_2,noise_B_2)
