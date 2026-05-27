@@ -2,7 +2,6 @@ import math
 import random
 import matplotlib.pyplot as plt
 
-# Import the standalone step functions from your existing files
 from mwu_sim import mwu_step
 from pgd_sim import pgd_step
 
@@ -58,7 +57,6 @@ for i in range(100):
     p2 = random.uniform(0.01, 0.99)
     test_scenarios.append((p1, p2))
 
-
 # Plotting Loop
 plt.figure(figsize=(8, 8))
 
@@ -86,64 +84,6 @@ plt.scatter([0.5], [0.5], color='red', s=40, zorder=4, label="Unstable Equilibri
 
 plt.grid(True)
 plt.legend()
-
-
-def check_convergence_destination(p1_start, p2_start):
-    """Runs a quiet, noiseless simulation to see where a coordinate ends up."""
-    # Temporarily ensure you pass noise=0 to your step functions inside here
-    history = run_mixed_simulation(p1_start, p2_start, iterations=200)
-    final_p1, final_p2 = history[-1]
-
-    # Return 1 if it goes to the top-right, 0 if it goes to the bottom-left
-    if final_p1 > 0.5 and final_p2 > 0.5:
-        return 1
-    return 0
-
-
-def find_separatrix_y(p1_coordinate, tolerance=1e-5):
-    """Uses binary search to find the precise y-boundary for a given x."""
-    low_y = 0.0
-    high_y = 1.0
-
-    while (high_y - low_y) > tolerance:
-        mid_y = (low_y + high_y) / 2
-        destination = check_convergence_destination(p1_coordinate, mid_y)
-
-        # If it went to (1,1), the boundary is lower down
-        if destination == 1:
-            high_y = mid_y
-        # If it went to (0,0), the boundary is higher up
-        else:
-            low_y = mid_y
-
-    return (low_y + high_y) / 2
-
-
-# ========================================================
-# CALCULATING THE GRADIENT
-# ========================================================
-
-# Step 1: Find the y-boundary at x = 0.4
-x1 = 0.4
-y1 = find_separatrix_y(x1)
-
-# Step 2: Find the y-boundary at x = 0.6
-x2 = 0.6
-y2 = find_separatrix_y(x2)
-
-# Step 3: Compute Gradient (m = change in y / change in x)
-gradient = (y2 - y1) / (x2 - x1)
-
-print(f"Point 1 on Separatrix: ({x1}, {y1:.5f})")
-print(f"Point 2 on Separatrix: ({x2}, {y2:.5f})")
-print(f"Calculated Gradient (Slope) of the line: {gradient:.4f}")
-
-
-line_x = [0.0, 1.0]
-line_y = [gradient * (x - 0.5) + 0.5 for x in line_x]
-plt.plot(line_x, line_y, color="red", linestyle="--", linewidth=2, zorder=4,
-         label=f"Straight Separatrix (Slope: {gradient:.2f})")
-
 
 plt.show()
 
