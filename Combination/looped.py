@@ -7,7 +7,7 @@ from mwu_sim import mwu_step
 from pgd_sim import pgd_step
 
 
-def run_mixed_simulation(p1_start, p2_start, iterations=1000, noise=0.1):
+def run_mixed_simulation(p1_start, p2_start, iterations=5000, noise=0.1):
     p1_score_A = math.log(p1_start)
     p1_score_B = math.log(1 - p1_start)
     p2_conf = p2_start
@@ -46,20 +46,6 @@ def check_convergence_destination(p1_start, p2_start):
     return 1 if (final_p1 > 0.5 and final_p2 > 0.5) else 0
 
 
-def find_separatrix_y(p1_coordinate, tolerance=1e-5):
-    low_y, high_y = 0.0, 1.0
-
-    while (high_y - low_y) > tolerance:
-        mid_y = (low_y + high_y) / 2
-        destination = check_convergence_destination(p1_coordinate, mid_y)
-
-        if destination == 1:
-            high_y = mid_y
-        else:
-            low_y = mid_y
-
-    return (low_y + high_y) / 2
-
 fig, ax = plt.subplots(figsize=(8, 8))
 plt.subplots_adjust(bottom=0.2)
 
@@ -76,7 +62,7 @@ def run_and_plot(event=None):
     test_scenarios = []
     for i in range(40):
         p1 = random.uniform(0, 1)
-        x = random.uniform(-0.02, 0.02)
+        x = random.uniform(-0.2, 0.2)
 
         p2 = 1 - p1 + x
 
@@ -93,23 +79,8 @@ def run_and_plot(event=None):
 
         ax.plot(x_coords, y_coords, color="navy", linewidth=1, alpha=0.5)
         ax.scatter(p1, p2, color="black", s=15)
+        ax.scatter(x_coords[-1], y_coords[-1], color="black", s=15)
 
-    x1, x2 = 0.4, 0.6
-    y1 = find_separatrix_y(x1)
-    y2 = find_separatrix_y(x2)
-
-    gradient = (y2 - y1) / (x2 - x1)
-
-    print(f"Gradient: {gradient:.4f}")
-
-    line_x = [0.0, 1.0]
-    line_y = [gradient * (x - 0.5) + 0.5 for x in line_x]
-
-    ax.plot(
-        line_x, line_y,
-        color="red", linestyle="--", linewidth=2,
-        label=f"Separatrix slope: {gradient:.2f}"
-    )
 
     ax.set_xlim(-0.01, 1.01)
     ax.set_ylim(-0.01, 1.01)
