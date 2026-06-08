@@ -6,7 +6,8 @@ from mwu_sim import mwu_step
 from pgd_sim import pgd_step
 
 
-def run_mixed_simulation(p1_start, p2_start, iterations=1000, noise = 0.2):
+def run_mixed_simulation(p1_start, p2_start, payoff_matrix_p1, payoff_matrix_p2, iterations=1000, noise=0.2):
+
     # Initialize Player 1 (MWU) internal log-scores
     p1_score_A = math.log(p1_start)
     p1_score_B = math.log(1 - p1_start)
@@ -33,18 +34,16 @@ def run_mixed_simulation(p1_start, p2_start, iterations=1000, noise = 0.2):
         noise_B_2 = random.uniform(0, noise)
 
         # 1. Compute PGD's next move based on MWU's current confidence
-        next_p2_conf = pgd_step(p2_conf, p1_conf, learning_speed, noise_A_2,noise_B_2)
+        next_p2_conf = pgd_step(p2_conf, p1_conf, learning_speed, payoff_matrix_p2, noise_A_2,noise_B_2)
 
         # 2. Compute MWU's next scores based on PGD's current confidence
-        next_p1_score_A, next_p1_score_B = mwu_step(p1_score_A, p1_score_B, p2_conf, learning_speed, noise_A_1, noise_B_1)
+        next_p1_score_A, next_p1_score_B = mwu_step(p1_score_A, p1_score_B, p2_conf, learning_speed, payoff_matrix_p1, noise_A_1, noise_B_1)
 
-        # Advance the state
         p2_conf = next_p2_conf
         p1_score_A = next_p1_score_A
         p1_score_B = next_p1_score_B
 
     return history
-
 
 # ==========================================
 # GRAPHICS GENERATION
@@ -60,8 +59,19 @@ for i in range(100):
 # Plotting Loop
 plt.figure(figsize=(8, 8))
 
+payoff_matrix_p1 = [
+    [2, 0],
+    [0, 3]
+]
+
+payoff_matrix_p2 = [
+    [2, 0],
+    [0, 3]
+]
+
+
 for p1, p2 in test_scenarios:
-    history = run_mixed_simulation(p1, p2)
+    history = run_mixed_simulation(p1, p2, payoff_matrix_p1, payoff_matrix_p2)
 
     x_coords = [h[0] for h in history]
     y_coords = [h[1] for h in history]
