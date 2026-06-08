@@ -1,193 +1,288 @@
-import math
 import random
+import math
 import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
-def simulate_mwu_3players(p1_start_chance, p2_start_chance, p3_start_chance, matrix_p1, matrix_p2, matrix_p3, learning_rate=0.1, iterations=1000):
-    noise_level = 0.2
-
-    # Init scores
+def simulate_mixed_game(
+    p1_start_chance,
+    p2_start_chance,
+    p3_start_chance,
+    matrix_p1,
+    matrix_p2,
+    matrix_p3,
+    learning_rate=0.1,
+    iterations=1000,
+    noise_level=0
+):
+    # --- PLAYER 1 (MWU) INITIALIZATION ---
+    p1_start_chance = max(0.001, min(0.999, p1_start_chance))
     p1_score_A = math.log(p1_start_chance)
     p1_score_B = math.log(1 - p1_start_chance)
 
-    p2_score_A = math.log(p2_start_chance)
-    p2_score_B = math.log(1 - p2_start_chance)
-
-    p3_score_A = math.log(p3_start_chance)
-    p3_score_B = math.log(1 - p3_start_chance)
+    # --- PLAYER 2 & 3 (PGD) INITIALIZATION ---
+    p2_confidence_A = p2_start_chance
+    p3_confidence_A = p3_start_chance
 
     plot_history = []
 
     for i in range(iterations):
-        # Robbins-Monro step size
         learning_speed = learning_rate / math.sqrt(i + 1)
 
-        # Confidence p1
-        denom1 = math.exp(p1_score_A) + math.exp(p1_score_B)
-        p1_confidence_A = math.exp(p1_score_A) / denom1
+        # MWU probabilities (Player 1)
+        try:
+            denom1 = math.exp(p1_score_A) + math.exp(p1_score_B)
+            p1_confidence_A = math.exp(p1_score_A) / denom1
+        except OverflowError:
+            max_score = max(p1_score_A, p1_score_B)
+            denom1 = math.exp(p1_score_A - max_score) + math.exp(p1_score_B - max_score)
+            p1_confidence_A = math.exp(p1_score_A - max_score) / denom1
+
         p1_confidence_B = 1 - p1_confidence_A
 
-        # Confidence p2
-        denom2 = math.exp(p2_score_A) + math.exp(p2_score_B)
-        p2_confidence_A = math.exp(p2_score_A) / denom2
+        # PGD probabilities
         p2_confidence_B = 1 - p2_confidence_A
-
-        # Confidence p3
-        denom3 = math.exp(p3_score_A) + math.exp(p3_score_B)
-        p3_confidence_A = math.exp(p3_score_A) / denom3
         p3_confidence_B = 1 - p3_confidence_A
 
         plot_history.append((p1_confidence_A, p2_confidence_A, p3_confidence_A))
 
-        reward_1_A = (p2_confidence_A + p3_confidence_A) * matrix_p1[0][0] + (p2_confidence_B + p3_confidence_B) * matrix_p1[0][1]
-        reward_1_B = (p2_confidence_A + p3_confidence_A) * matrix_p1[1][0] + (p2_confidence_B + p3_confidence_B) * matrix_p1[1][1]
+        reward_1_A = (
+            p2_confidence_A * matrix_p1[0][0] + p2_confidence_B * matrix_p1[0][1] +
+            p3_confidence_A * matrix_p1[0][0] + p3_confidence_B * matrix_p1[0][1]
+        )
+        reward_1_B = (
+            p2_confidence_A * matrix_p1[1][0] + p2_confidence_B * matrix_p1[1][1] +
+            p3_confidence_A * matrix_p1[1][0] + p3_confidence_B * matrix_p1[1][1]
+        )
+        reward_2_A = (
+            p1_confidence_A * matrix_p2[0][0] + p1_confidence_B * matrix_p2[0][1] +
+            p3_confidence_A * matrix_p2[0][0] + p3_confidence_B * matrix_p2[0][1]
+        )
+        reward_2_B = (
+            p1_confidence_A * matrix_p2[1][0] + p1_confidence_B * matrix_p2[1][1] +
+            p3_confidence_A * matrix_p2[1][0] + p3_confidence_B * matrix_p2[1][1]
+        )
+        reward_3_A = (
+            p1_confidence_A * matrix_p3[0][0] + p1_confidence_B * matrix_p3[0][1] +
+            p2_confidence_A * matrix_p3[0][0] + p2_confidence_B * matrix_p3[0][1]
+        )
+        reward_3_B = (
+            p1_confidence_A * matrix_p3[1][0] + p1_confidence_B * matrix_p3[1][1] +
+            p2_confidence_A * matrix_p3[1][0] + p2_confidence_B * matrix_p3[1][1]
+        )
 
-        reward_2_A = (p1_confidence_A + p3_confidence_A) * matrix_p2[0][0] + (p1_confidence_B + p3_confidence_B) * matrix_p2[0][1]
-        reward_2_B = (p1_confidence_A + p3_confidence_A) * matrix_p2[1][0] + (p1_confidence_B + p3_confidence_B) * matrix_p2[1][1]
+        if noise_level > 0:
+            reward_1_A += random.uniform(-noise_level, noise_level)
+            reward_1_B += random.uniform(-noise_level, noise_level)
+            reward_2_A += random.uniform(-noise_level, noise_level)
+            reward_2_B += random.uniform(-noise_level, noise_level)
+            reward_3_A += random.uniform(-noise_level, noise_level)
+            reward_3_B += random.uniform(-noise_level, noise_level)
 
-        reward_3_A = (p1_confidence_A + p2_confidence_A) * matrix_p3[0][0] + (p1_confidence_B + p2_confidence_B) * matrix_p3[0][1]
-        reward_3_B = (p1_confidence_A + p2_confidence_A) * matrix_p3[1][0] + (p1_confidence_B + p2_confidence_B) * matrix_p3[1][1]
-
-        reward_1_A += random.uniform(-noise_level, noise_level)
-        reward_1_B += random.uniform(-noise_level, noise_level)
-        reward_2_A += random.uniform(-noise_level, noise_level)
-        reward_2_B += random.uniform(-noise_level, noise_level)
-        reward_3_A += random.uniform(-noise_level, noise_level)
-        reward_3_B += random.uniform(-noise_level, noise_level)
-
+        # Player 1 (MWU Score Update)
         p1_score_A += learning_speed * reward_1_A
         p1_score_B += learning_speed * reward_1_B
 
-        p2_score_A += learning_speed * reward_2_A
-        p2_score_B += learning_speed * reward_2_B
+        p2_confidence_A += learning_speed * (reward_2_A - reward_2_B)
+        p2_confidence_A = max(0, min(1, p2_confidence_A))
 
-        p3_score_A += learning_speed * reward_3_A
-        p3_score_B += learning_speed * reward_3_B
+        p3_confidence_A += learning_speed * (reward_3_A - reward_3_B)
+        p3_confidence_A = max(0, min(1, p3_confidence_A))
 
     return plot_history
 
 
-payoff_matrix_p1 = [
-    [1, 0],
-    [0, 1]
-]
+def detect_attractor(final_state, threshold=0.5):
+    """Returns True if the trajectory converged to the A-attractor (1,1,1)."""
+    return sum(final_state) > 3 * threshold
 
-payoff_matrix_p2 = payoff_matrix_p1
-payoff_matrix_p3 = payoff_matrix_p1
 
+def compute_separatrix_plane(matrix_p1, matrix_p2, matrix_p3,
+                              n_probes=300, bisection_steps=15,
+                              learning_rate=0.1, iters=2000):
+    """
+    Empirically locates the separatrix by:
+      1. Sampling random pairs of starting conditions in opposite basins.
+      2. Binary-searching (bisecting) along the line between each pair to find
+         the exact basin boundary point.
+      3. Fitting a best-fit plane through all boundary points via SVD.
+
+    Returns (A, B, C, D) coefficients of the plane Ax + By + Cz = D,
+    and the array of boundary points used for fitting.
+    """
+    def final_state(p1, p2, p3):
+        hist = simulate_mixed_game(p1, p2, p3, matrix_p1, matrix_p2, matrix_p3,
+                                   learning_rate=learning_rate, iterations=iters,
+                                   noise_level=0.0)
+        return hist[-1]
+
+    def in_basin_A(p):
+        return detect_attractor(final_state(*p))
+
+    boundary_pts = []
+    attempts = 0
+    while len(boundary_pts) < n_probes and attempts < n_probes * 10:
+        attempts += 1
+        a = np.random.uniform(0.05, 0.95, 3)
+        b = np.random.uniform(0.05, 0.95, 3)
+        ba = in_basin_A(a)
+        bb = in_basin_A(b)
+        if ba == bb:
+            continue  # Same basin — no boundary crossing on this segment
+
+        # Bisect to find the precise boundary crossing
+        lo, hi = a.copy(), b.copy()
+        lo_basin = ba
+        for _ in range(bisection_steps):
+            mid = (lo + hi) / 2.0
+            if in_basin_A(mid) == lo_basin:
+                lo = mid
+            else:
+                hi = mid
+        boundary_pts.append((lo + hi) / 2.0)
+
+    if len(boundary_pts) < 3:
+        raise ValueError(
+            f"Could only find {len(boundary_pts)} boundary points — "
+            "not enough to fit a plane. Try different payoff matrices."
+        )
+
+    pts = np.array(boundary_pts)
+    centroid = pts.mean(axis=0)
+
+    # SVD: the right singular vector corresponding to the smallest singular value
+    # is the normal to the best-fit plane through the point cloud.
+    _, _, Vt = np.linalg.svd(pts - centroid)
+    normal = Vt[-1]
+    D = float(np.dot(normal, centroid))
+    A, B, C = float(normal[0]), float(normal[1]), float(normal[2])
+
+    residuals = np.abs(pts @ normal - D)
+    print(f"  Separatrix plane fit: {A:.4f}x + {B:.4f}y + {C:.4f}z = {D:.4f}")
+    print(f"  Points used: {len(pts)} | Residuals: mean={residuals.mean():.4f}, max={residuals.max():.4f}")
+
+    return A, B, C, D, pts
+
+
+def calculate_plane_polygon(A, B, C, D):
+    """
+    Finds intersection vertices of the plane Ax + By + Cz = D
+    with the unit cube [0,1]^3, sorted angularly to form a polygon.
+    """
+    points = []
+
+    for y in [0, 1]:
+        for z in [0, 1]:
+            if A != 0:
+                x = (D - B * y - C * z) / A
+                if 0 <= x <= 1:
+                    points.append([x, y, z])
+
+    for x in [0, 1]:
+        for z in [0, 1]:
+            if B != 0:
+                y = (D - A * x - C * z) / B
+                if 0 <= y <= 1:
+                    points.append([x, y, z])
+
+    for x in [0, 1]:
+        for y in [0, 1]:
+            if C != 0:
+                z = (D - A * x - B * y) / C
+                if 0 <= z <= 1:
+                    points.append([x, y, z])
+
+    if not points:
+        return []
+
+    unique_points = np.unique(np.round(points, decimals=5), axis=0)
+
+    if len(unique_points) < 3:
+        return []
+
+    centroid = np.mean(unique_points, axis=0)
+    normal = np.array([A, B, C]) / np.linalg.norm([A, B, C])
+
+    if abs(normal[0]) < 0.9:
+        v1 = np.cross(normal, [1, 0, 0])
+    else:
+        v1 = np.cross(normal, [0, 1, 0])
+    v1 /= np.linalg.norm(v1)
+    v2 = np.cross(normal, v1)
+
+    angles = [np.arctan2(np.dot(p - centroid, v2), np.dot(p - centroid, v1))
+              for p in unique_points]
+    return unique_points[np.argsort(angles)].tolist()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MAIN
+# ─────────────────────────────────────────────────────────────────────────────
+
+payoff_matrix_p1 = [[1, 0],
+                    [0, 1]]
+payoff_matrix_p2 = [[1, 0],
+                    [0, 1]]
+payoff_matrix_p3 = [[1, 0],
+                    [0, 1]]
+
+# ── 1. Compute the separatrix from data ──────────────────────────────────────
+print("Computing data-driven separatrix (this may take a moment)...")
+np.random.seed(42)
+random.seed(42)
+
+A_sep, B_sep, C_sep, D_sep, sep_pts = compute_separatrix_plane(
+    payoff_matrix_p1, payoff_matrix_p2, payoff_matrix_p3,
+    n_probes=250,
+    bisection_steps=15,
+    iters=2000,
+)
+
+# ── 2. Run trajectory simulations ────────────────────────────────────────────
 test_scenarios = []
-for i in range(40):
+for _ in range(100):
     p1 = random.uniform(0.01, 0.99)
     p2 = random.uniform(0.01, 0.99)
     p3 = random.uniform(0.01, 0.99)
     test_scenarios.append((p1, p2, p3))
 
-"""for i in range(30):
-    p1 = random.uniform(0, 1)
-    p2 = 1 - p1 + random.uniform(-0.02, 0.02)
-    p2 = max(0, min(1, p2))
-    p3 = random.uniform(0, 1) # randomized 3rd axis variant
-    test_scenarios.append((p1, p2, p3))"""
-
-# Setup Graphics for 3D Plotting
+# ── 3. Plot ───────────────────────────────────────────────────────────────────
 fig = plt.figure(figsize=(10, 8))
 ax = fig.add_subplot(111, projection='3d')
 
 for p1, p2, p3 in test_scenarios:
-    history = simulate_mwu_3players(p1, p2, p3, payoff_matrix_p1, payoff_matrix_p2, payoff_matrix_p3)
-
+    history = simulate_mixed_game(p1, p2, p3, payoff_matrix_p1, payoff_matrix_p2, payoff_matrix_p3)
     x = [h[0] for h in history]
     y = [h[1] for h in history]
     z = [h[2] for h in history]
-
-    # Plot the trajectories
     ax.plot(x, y, z, color="navy", linewidth=1, alpha=0.6)
-    # Mark the start points
     ax.scatter(p1, p2, p3, color='black', s=15, zorder=3)
 
-# Labeling axes
-ax.set_xlabel("Player 1 confidence in A")
-ax.set_ylabel("Player 2 confidence in A")
-ax.set_zlabel("Player 3 confidence in A")
+# Unstable equilibrium
+ax.scatter([0.5], [0.5], [0.5], color='red', s=50, zorder=5, label='Unstable Equilibrium')
 
-ax.set_title("3-Player Coordination Game (Multiplicative Weights)")
+# Data-driven separatrix plane
+vertices = calculate_plane_polygon(A_sep, B_sep, C_sep, D_sep)
+if vertices:
+    separatrix = Poly3DCollection(
+        [vertices], alpha=0.35,
+        facecolors='mediumseagreen',
+        edgecolors='darkgreen',
+        linewidths=1.5
+    )
+    separatrix.set_label('Data-Driven Separatrix')
+    ax.add_collection3d(separatrix)
 
+
+ax.set_xlabel("Player 1 confidence (MWU)")
+ax.set_ylabel("Player 2 confidence (PGD)")
+ax.set_zlabel("Player 3 confidence (PGD)")
 ax.set_xlim(0, 1)
 ax.set_ylim(0, 1)
 ax.set_zlim(0, 1)
-
-# Central unstable Nash equilibrium point (0.5, 0.5, 0.5)
-ax.scatter([0.5], [0.5], [0.5], color='red', s=50, label='Unstable Equilibrium')
-
-
-#seperatix?
-def calculate_separatrix_vertices(c=1.5):
-    """
-    Dynamically finds and sorts the intersection points of the plane
-    x + y + z = c within the unit cube [0, 1]^3.
-    """
-    points = []
-
-    # Check 4 edges parallel to X-axis (y and z fixed at 0 or 1)
-    for y in [0, 1]:
-        for z in [0, 1]:
-            x = c - y - z
-            if 0 <= x <= 1: points.append([x, y, z])
-
-    # Check 4 edges parallel to Y-axis (x and z fixed at 0 or 1)
-    for x in [0, 1]:
-        for z in [0, 1]:
-            y = c - x - z
-            if 0 <= y <= 1: points.append([x, y, z])
-
-    # Check 4 edges parallel to Z-axis (x and y fixed at 0 or 1)
-    for x in [0, 1]:
-        for y in [0, 1]:
-            z = c - x - y
-            if 0 <= z <= 1: points.append([x, y, z])
-
-    # Filter out any duplicate corners
-    unique_points = np.unique(points, axis=0)
-
-    if len(unique_points) < 3:
-        return []
-
-    # Sort vertices angularly around their centroid so the polygon renders cleanly
-    centroid = np.mean(unique_points, axis=0)
-
-    # Define a 2D coordinate system on the plane (Normal vector is [1, 1, 1])
-    normal = np.array([1.0, 1.0, 1.0])
-    v1 = np.array([1.0, -1.0, 0.0])  # Perpendicular to normal
-    v1 /= np.linalg.norm(v1)
-    v2 = np.cross(normal, v1)  # Perpendicular to both
-    v2 /= np.linalg.norm(v2)
-
-    # Project 3D points to 2D plane angles relative to the centroid
-    angles = []
-    for p in unique_points:
-        vector_from_center = p - centroid
-        x_proj = np.dot(vector_from_center, v1)
-        y_proj = np.dot(vector_from_center, v2)
-        angles.append(np.arctan2(y_proj, x_proj))
-
-    # Sort points using the computed angles
-    sorted_indices = np.argsort(angles)
-    return unique_points[sorted_indices].tolist()
-
-calculated_vertices = calculate_separatrix_vertices(c=1.5)
-
-if calculated_vertices:
-    separatrix = Poly3DCollection([calculated_vertices], alpha=0.25, facecolors='crimson', edgecolors='darkred', linewidths=1.5)
-    separatrix.set_label('Calculated Separatrix (x+y+z=1.5)')
-    ax.add_collection3d(separatrix)
-
-# Adjust viewing angle to visualize the dynamic split clearly
 ax.view_init(elev=25, azim=-45)
-
-# Add the polygon to your 3D axes
-# Add a legend to keep things organized
 ax.legend()
-
-
+plt.title("Mixed Learning Dynamics: MWU (P1) vs PGD (P2 & P3)\n(Separatrix fitted from basin-boundary bisection)")
+plt.grid(True)
 plt.show()
+print("Done. Plot saved.")
