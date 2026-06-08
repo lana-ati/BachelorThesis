@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
-def simulate_mwu_3players(p1_start_chance, p2_start_chance, p3_start_chance, learning_rate=0.1, iterations=1000):
+def simulate_mwu_3players(p1_start_chance, p2_start_chance, p3_start_chance, matrix_p1, matrix_p2, matrix_p3, learning_rate=0.1, iterations=1000):
     noise_level = 0.2
 
     # Init scores
@@ -40,14 +40,14 @@ def simulate_mwu_3players(p1_start_chance, p2_start_chance, p3_start_chance, lea
 
         plot_history.append((p1_confidence_A, p2_confidence_A, p3_confidence_A))
 
-        reward_1_A = p2_confidence_A + p3_confidence_A
-        reward_1_B = p2_confidence_B + p3_confidence_B
+        reward_1_A = (p2_confidence_A + p3_confidence_A) * matrix_p1[0][0] + (p2_confidence_B + p3_confidence_B) * matrix_p1[0][1]
+        reward_1_B = (p2_confidence_A + p3_confidence_A) * matrix_p1[1][0] + (p2_confidence_B + p3_confidence_B) * matrix_p1[1][1]
 
-        reward_2_A = p1_confidence_A + p3_confidence_A
-        reward_2_B = p1_confidence_B + p3_confidence_B
+        reward_2_A = (p1_confidence_A + p3_confidence_A) * matrix_p2[0][0] + (p1_confidence_B + p3_confidence_B) * matrix_p2[0][1]
+        reward_2_B = (p1_confidence_A + p3_confidence_A) * matrix_p2[1][0] + (p1_confidence_B + p3_confidence_B) * matrix_p2[1][1]
 
-        reward_3_A = p1_confidence_A + p2_confidence_A
-        reward_3_B = p1_confidence_B + p2_confidence_B
+        reward_3_A = (p1_confidence_A + p2_confidence_A) * matrix_p3[0][0] + (p1_confidence_B + p2_confidence_B) * matrix_p3[0][1]
+        reward_3_B = (p1_confidence_A + p2_confidence_A) * matrix_p3[1][0] + (p1_confidence_B + p2_confidence_B) * matrix_p3[1][1]
 
         reward_1_A += random.uniform(-noise_level, noise_level)
         reward_1_B += random.uniform(-noise_level, noise_level)
@@ -67,8 +67,16 @@ def simulate_mwu_3players(p1_start_chance, p2_start_chance, p3_start_chance, lea
 
     return plot_history
 
-test_scenarios = []
 
+payoff_matrix_p1 = [
+    [1, 0],
+    [0, 1]
+]
+
+payoff_matrix_p2 = payoff_matrix_p1
+payoff_matrix_p3 = payoff_matrix_p1
+
+test_scenarios = []
 for i in range(40):
     p1 = random.uniform(0.01, 0.99)
     p2 = random.uniform(0.01, 0.99)
@@ -87,7 +95,7 @@ fig = plt.figure(figsize=(10, 8))
 ax = fig.add_subplot(111, projection='3d')
 
 for p1, p2, p3 in test_scenarios:
-    history = simulate_mwu_3players(p1, p2, p3)
+    history = simulate_mwu_3players(p1, p2, p3, payoff_matrix_p1, payoff_matrix_p2, payoff_matrix_p3)
 
     x = [h[0] for h in history]
     y = [h[1] for h in history]
@@ -105,7 +113,6 @@ ax.set_zlabel("Player 3 confidence in A")
 
 ax.set_title("3-Player Coordination Game (Multiplicative Weights)")
 
-# Boundaries
 ax.set_xlim(0, 1)
 ax.set_ylim(0, 1)
 ax.set_zlim(0, 1)
