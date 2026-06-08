@@ -5,13 +5,6 @@ import numpy as np
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 
-import random
-import math
-import matplotlib.pyplot as plt
-import numpy as np
-from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-
-
 def simulate_mixed_game(
     p1_start_chance,
     p2_start_chance,
