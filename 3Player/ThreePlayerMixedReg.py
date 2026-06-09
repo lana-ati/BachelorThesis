@@ -13,9 +13,9 @@ def simulate_mixed_game(
     matrix_p2,
     matrix_p3,
     learning_rate=0.1,
-    iterations=1000
-):
+    iterations=1000,
     noise_level = 0.1
+):
 
     # --- PLAYER 1 (MWU) INITIALIZATION ---
     p1_start_chance = max(0.001, min(0.999, p1_start_chance))
