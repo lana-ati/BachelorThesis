@@ -60,13 +60,13 @@ for i in range(100):
 plt.figure(figsize=(8, 8))
 
 payoff_matrix_p1 = [
-    [2, 0],
-    [0, 3]
+    [1, 0],
+    [0, 1]
 ]
 
 payoff_matrix_p2 = [
-    [2, 0],
-    [0, 3]
+    [1, 0],
+    [0, 1]
 ]
 
 
@@ -86,8 +86,25 @@ plt.xlabel("Player 1 confidence in A (MWU)")
 plt.ylabel("Player 2 confidence in A (PGD)")
 plt.title("Coordination Game: Asymmetric Dynamics (MWU vs PGD)")
 
+a = payoff_matrix_p1[0][0]
+b = payoff_matrix_p2[1][1]
+gradient = -(a+b) / math.sqrt(a*b)
+
+c = b/ (a+b)
+
+line_x = [0.0, 1.0]
+line_y = [gradient * (x - c) + c for x in line_x]
+plt.plot(line_x, line_y, color="red", linestyle="--", linewidth=2, zorder=4,
+         label=f"Straight Separatrix (Slope: {gradient:.2f})")
+
 plt.xlim(-0.01, 1.01)
 plt.ylim(-0.01, 1.01)
+
+intercept = c - gradient * c
+
+print(
+    f"{gradient:.4f}x - 1.0000y = {-intercept:.4f}"
+)
 
 # Highlight center unstable Nash Equilibrium
 plt.scatter([0.5], [0.5], color='red', s=40, zorder=4, label="Unstable Equilibrium")
@@ -96,4 +113,3 @@ plt.grid(True)
 plt.legend()
 
 plt.show()
-
