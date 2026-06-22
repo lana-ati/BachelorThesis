@@ -85,6 +85,7 @@ payoff_matrix_p2 = [
     [0, 1]
 ]
 
+
 #Graphics!
 for p1, p2 in test_scenarios:
     history = simulate_mwu(p1, p2, payoff_matrix_p1, payoff_matrix_p2)

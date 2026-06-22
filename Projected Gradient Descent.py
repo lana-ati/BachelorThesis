@@ -66,6 +66,7 @@ for i in range(40):
     p2 = random.uniform(0.01, 0.99)
     test_scenarios.append((p1, p2))
 
+
 payoff_matrix_p1 = [
     [1, 0],
     [0, 1]
