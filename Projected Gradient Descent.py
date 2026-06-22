@@ -2,7 +2,7 @@ import random
 import math
 import matplotlib.pyplot as plt
 
-def simulate_pgd(p1_start_chance, p2_start_chance, learning_rate=0.1, iterations=1000):
+def simulate_pgd(p1_start_chance, p2_start_chance,  payoff_matrix_p1, payoff_matrix_p2, learning_rate=0.1, iterations=1000):
     noise_level = 0.2
 
     p1_confidence_A = p1_start_chance
@@ -21,11 +21,27 @@ def simulate_pgd(p1_start_chance, p2_start_chance, learning_rate=0.1, iterations
         plot_history.append((p1_confidence_A, p2_confidence_A))
 
         #calculate rewards
-        reward_1_A = 2 * p2_confidence_A
-        reward_1_B = 2 * p2_confidence_B
+        # calculate expected rewards
 
-        reward_2_A = 2 * p1_confidence_A
-        reward_2_B = 2 * p1_confidence_B
+        reward_1_A = (
+                payoff_matrix_p1[0][0] * p2_confidence_A +
+                payoff_matrix_p1[0][1] * p2_confidence_B
+        )
+
+        reward_1_B = (
+                payoff_matrix_p1[1][0] * p2_confidence_A +
+                payoff_matrix_p1[1][1] * p2_confidence_B
+        )
+
+        reward_2_A = (
+                payoff_matrix_p2[0][0] * p1_confidence_A +
+                payoff_matrix_p2[1][0] * p1_confidence_B
+        )
+
+        reward_2_B = (
+                payoff_matrix_p2[0][1] * p1_confidence_A +
+                payoff_matrix_p2[1][1] * p1_confidence_B
+        )
 
         #noise
         reward_1_A += random.uniform(-noise_level, noise_level)
@@ -44,18 +60,25 @@ def simulate_pgd(p1_start_chance, p2_start_chance, learning_rate=0.1, iterations
     return plot_history
 
 
-test_scenarios = [
-    (0.1, 0.1), (0.1, 0.4), (0.1, 0.7), (0.1, 0.9),
-    (0.4, 0.1), (0.7, 0.1), (0.9, 0.1),
-    (0.4, 0.9), (0.7, 0.9), (0.9, 0.9),
-    (0.9, 0.4), (0.9, 0.7),
-    (0.45, 0.55), (0.55, 0.45)
+test_scenarios = []
+for i in range(40):
+    p1 = random.uniform(0.01, 0.99)
+    p2 = random.uniform(0.01, 0.99)
+    test_scenarios.append((p1, p2))
+
+payoff_matrix_p1 = [
+    [1, 0],
+    [0, 1]
 ]
 
+payoff_matrix_p2 = [
+    [1, 0],
+    [0, 1]
+]
 
 #Graphics!
 for p1, p2 in test_scenarios:
-    history = simulate_pgd(p1, p2)
+    history = simulate_pgd(p1, p2, payoff_matrix_p1, payoff_matrix_p2)
 
     x = [h[0] for h in history]
     y = [h[1] for h in history]
