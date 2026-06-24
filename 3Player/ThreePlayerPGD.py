@@ -104,47 +104,167 @@ ax.set_zlim(0, 1)
 # Unstable equilibrium point at the center (0.5, 0.5, 0.5)
 ax.scatter([0.5], [0.5], [0.5], color='red', s=50)
 
-#seperatix?
-def calculate_separatrix_vertices(c=1.5):
+def calculate_plane_polygon(A, B, C, D):
     points = []
+
     for y in [0, 1]:
         for z in [0, 1]:
-            x = c - y - z
-            if 0 <= x <= 1: points.append([x, y, z])
+            if abs(A) > 1e-12:
+                x = (D - B*y - C*z) / A
+                if 0 <= x <= 1:
+                    points.append([x, y, z])
+
     for x in [0, 1]:
         for z in [0, 1]:
-            y = c - x - z
-            if 0 <= y <= 1: points.append([x, y, z])
+            if abs(B) > 1e-12:
+                y = (D - A*x - C*z) / B
+                if 0 <= y <= 1:
+                    points.append([x, y, z])
+
     for x in [0, 1]:
         for y in [0, 1]:
-            z = c - x - y
-            if 0 <= z <= 1: points.append([x, y, z])
+            if abs(C) > 1e-12:
+                z = (D - A*x - B*y) / C
+                if 0 <= z <= 1:
+                    points.append([x, y, z])
 
-    unique_points = np.unique(points, axis=0)
-    if len(unique_points) < 3: return []
+    unique_points = np.unique(np.round(points, 5), axis=0)
 
     centroid = np.mean(unique_points, axis=0)
-    normal = np.array([1.0, 1.0, 1.0])
-    v1 = np.array([1.0, -1.0, 0.0])
+
+    normal = np.array([A, B, C])
+    normal /= np.linalg.norm(normal)
+
+    if abs(normal[0]) < 0.9:
+        v1 = np.cross(normal, [1, 0, 0])
+    else:
+        v1 = np.cross(normal, [0, 1, 0])
+
     v1 /= np.linalg.norm(v1)
     v2 = np.cross(normal, v1)
-    v2 /= np.linalg.norm(v2)
 
-    angles = []
-    for p in unique_points:
-        vector_from_center = p - centroid
-        x_proj = np.dot(vector_from_center, v1)
-        y_proj = np.dot(vector_from_center, v2)
-        angles.append(np.arctan2(y_proj, x_proj))
+    angles = [
+        np.arctan2(np.dot(p - centroid, v2),
+                   np.dot(p - centroid, v1))
+        for p in unique_points
+    ]
 
-    sorted_indices = np.argsort(angles)
-    return unique_points[sorted_indices].tolist()
+    return unique_points[np.argsort(angles)].tolist()
 
-calculated_vertices = calculate_separatrix_vertices(c=1.5)
 
-if calculated_vertices:
-    separatrix = Poly3DCollection([calculated_vertices], alpha=0.25, facecolors='crimson', edgecolors='darkred', linewidths=1.5)
-    separatrix.set_label('Calculated Separatrix (x+y+z=1.5)')
+def detect_attractor(final_state, threshold=0.5):
+    return sum(final_state) > 3 * threshold
+
+
+def compute_separatrix_plane(matrix_p1, matrix_p2, matrix_p3,
+                              n_probes=250,
+                              bisection_steps=15,
+                              learning_rate=0.1,
+                              iters=2000):
+
+    def final_state(p1, p2, p3):
+        hist = simulate_pgd(
+            p1, p2, p3,
+            matrix_p1, matrix_p2, matrix_p3,
+            learning_rate=learning_rate,
+            iterations=iters
+        )
+        return hist[-1]
+
+    def in_basin_A(p):
+        return detect_attractor(final_state(*p))
+
+    boundary_pts = []
+
+    attempts = 0
+    while len(boundary_pts) < n_probes and attempts < n_probes * 10:
+        attempts += 1
+
+        a = np.random.uniform(0.05, 0.95, 3)
+        b = np.random.uniform(0.05, 0.95, 3)
+
+        ba = in_basin_A(a)
+        bb = in_basin_A(b)
+
+        if ba == bb:
+            continue
+
+        lo, hi = a.copy(), b.copy()
+        lo_basin = ba
+
+        for _ in range(bisection_steps):
+            mid = (lo + hi) / 2.0
+
+            if in_basin_A(mid) == lo_basin:
+                lo = mid
+            else:
+                hi = mid
+
+        boundary_pts.append((lo + hi) / 2.0)
+
+    pts = np.array(boundary_pts)
+
+    centroid = pts.mean(axis=0)
+
+    _, _, Vt = np.linalg.svd(pts - centroid)
+    normal = Vt[-1]
+
+    D = np.dot(normal, centroid)
+
+    A, B, C = normal
+
+    return A, B, C, D, pts
+
+
+
+print("Computing empirical separatrix...")
+
+A_sep, B_sep, C_sep, D_sep, sep_pts = compute_separatrix_plane(
+    payoff_matrix_p1,
+    payoff_matrix_p2,
+    payoff_matrix_p3,
+    n_probes=250,
+    bisection_steps=15,
+    iters=2000
+)
+# Normalize for prettier printing
+
+largest = max(abs(A_sep), abs(B_sep), abs(C_sep))
+
+A_sep /= largest
+B_sep /= largest
+C_sep /= largest
+D_sep /= largest
+
+# Make first nonzero coefficient positive
+if A_sep < 0:
+    A_sep *= -1
+    B_sep *= -1
+    C_sep *= -1
+    D_sep *= -1
+
+print(
+    f"Plane: "
+    f"{A_sep:.4f}x + {B_sep:.4f}y + {C_sep:.4f}z = {D_sep:.4f}"
+)
+
+vertices = calculate_plane_polygon(
+    A_sep,
+    B_sep,
+    C_sep,
+    D_sep
+)
+
+if vertices:
+    separatrix = Poly3DCollection(
+        [vertices],
+        alpha=0.25,
+        facecolors='crimson',
+        edgecolors='darkred',
+        linewidths=1.5
+    )
+
+    separatrix.set_label("Empirical Separatrix")
     ax.add_collection3d(separatrix)
 
 plt.grid(True)
