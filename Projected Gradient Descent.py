@@ -1,17 +1,17 @@
 import random
 import math
 import matplotlib.pyplot as plt
+from matplotlib.widgets import Slider, TextBox
 
-def simulate_pgd(p1_start_chance, p2_start_chance,  payoff_matrix_p1, payoff_matrix_p2, learning_rate=0.1, iterations=1000):
-    noise_level = 0.2
 
+def simulate_pgd(p1_start_chance, p2_start_chance, payoff_matrix_p1, payoff_matrix_p2, learning_rate=0.1,
+                 noise_level=0.2, iterations=1000):
     p1_confidence_A = p1_start_chance
     p2_confidence_A = p2_start_chance
 
     plot_history = []
 
     for i in range(iterations):
-
         #robbins monro step size
         learning_speed = learning_rate / math.sqrt(i + 1)
 
@@ -67,36 +67,81 @@ for i in range(40):
     test_scenarios.append((p1, p2))
 
 
+# Initial Default Parameters
+init_lr = 0.1
+init_noise = 0.2
+
 payoff_matrix_p1 = [
     [1, 0],
     [0, 1]
 ]
-
 payoff_matrix_p2 = [
     [1, 0],
     [0, 1]
 ]
 
 #Graphics!
-for p1, p2 in test_scenarios:
-    history = simulate_pgd(p1, p2, payoff_matrix_p1, payoff_matrix_p2)
-
-    x = [h[0] for h in history]
-    y = [h[1] for h in history]
-
-    plt.plot(x, y, color="navy", linewidth=1)
-    plt.scatter(p1, p2, color='black', s=15, zorder=3)
+fig, ax = plt.subplots()
+plt.subplots_adjust(bottom=0.35, left=0.25)
 
 
-plt.xlabel("Player 1 confidence in A")
-plt.ylabel("Player 2 confidence in A")
+def redraw_simulation(val=None):
+    """Clears the axes and redraws the simulation trajectories based on current UI values."""
+    ax.clear()
 
-plt.title("Coordination Game, both players using Projected Gradient Descent")
+    # Fetch parameters from sliders
+    lr = slider_lr.val
+    noise = slider_noise.val
 
-plt.xlim(0,1)
-plt.ylim(0,1)
+    # Safely parse payoff matrices from the text boxes
+    try:
+        m1 = eval(text_p1.text)
+        m2 = eval(text_p2.text)
+    except Exception:
+        # Fallback to default if text entry is invalid while typing
+        m1, m2 = payoff_matrix_p1, payoff_matrix_p2
 
-plt.scatter([0.5], [0.5], color='red', s=40)
+    # Run simulations and plot
+    for p1, p2 in test_scenarios:
+        history = simulate_pgd(p1, p2, m1, m2, learning_rate=lr, noise_level=noise)
+        x = [h[0] for h in history]
+        y = [h[1] for h in history]
+        ax.plot(x, y, color="navy", linewidth=1, alpha=0.7)
+        ax.scatter(p1, p2, color='black', s=15, zorder=3)
 
-plt.grid(True)
+    # Plot formatting
+    ax.set_xlabel("Player 1 confidence in A")
+    ax.set_ylabel("Player 2 confidence in A")
+    ax.set_title("Coordination Game (Projected Gradient Descent)")
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.scatter([0.5], [0.5], color='red', s=40, zorder=4)
+    ax.grid(True)
+    fig.canvas.draw_idle()
+
+
+# UI Layout controls
+
+ax_lr = plt.axes([0.25, 0.20, 0.65, 0.03])
+ax_noise = plt.axes([0.25, 0.15, 0.65, 0.03])
+
+slider_lr = Slider(ax_lr, 'Learning Rate', 0.01, 1.0, valinit=init_lr, valstep=0.01)
+slider_noise = Slider(ax_noise, 'Noise Level', 0.0, 1.0, valinit=init_noise, valstep=0.01)
+
+# Text Boxes for matrices
+ax_p1 = plt.axes([0.25, 0.08, 0.25, 0.04])
+ax_p2 = plt.axes([0.65, 0.08, 0.25, 0.04])
+
+text_p1 = TextBox(ax_p1, 'P1 Matrix ', initial=str(payoff_matrix_p1))
+text_p2 = TextBox(ax_p2, 'P2 Matrix ', initial=str(payoff_matrix_p2))
+
+# Bind update events to UI components
+slider_lr.on_changed(redraw_simulation)
+slider_noise.on_changed(redraw_simulation)
+text_p1.on_submit(redraw_simulation)
+text_p2.on_submit(redraw_simulation)
+
+# Initial draw
+redraw_simulation()
+
 plt.show()
