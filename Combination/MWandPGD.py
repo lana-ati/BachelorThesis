@@ -1,7 +1,7 @@
 import math
 import random
 import matplotlib.pyplot as plt
-from matplotlib.widgets import Slider
+from matplotlib.widgets import Slider, TextBox
 
 from mwu_sim import mwu_step
 from pgd_sim import pgd_step
@@ -186,8 +186,9 @@ print(
 plt.scatter([0.5], [0.5], color='red', s=40, zorder=4, label="Unstable Equilibrium")
 
 
-ax_lr = plt.axes([0.25,0.14,0.60,0.03])
-ax_noise = plt.axes([0.25,0.08,0.60,0.03])
+ax_lr = plt.axes([0.25, 0.20, 0.65, 0.03])
+ax_noise = plt.axes([0.25, 0.15, 0.65, 0.03])
+
 
 slider_lr = Slider(
     ax_lr,
@@ -206,6 +207,12 @@ slider_noise = Slider(
     valinit=init_noise,
     valstep=0.01
 )
+
+ax_p1 = plt.axes([0.25, 0.08, 0.25, 0.04])
+ax_p2 = plt.axes([0.65, 0.08, 0.25, 0.04])
+
+text_p1 = TextBox(ax_p1, 'P1 Matrix ', initial=str(payoff_matrix_p1))
+text_p2 = TextBox(ax_p2, 'P2 Matrix ', initial=str(payoff_matrix_p2))
 
 slider_lr.on_changed(redraw_simulation)
 slider_noise.on_changed(redraw_simulation)

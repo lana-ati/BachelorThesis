@@ -3,6 +3,7 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+from matplotlib.widgets import Slider, TextBox
 
 def simulate_mixed_game(
     p1_start_chance,
@@ -247,8 +248,13 @@ for _ in range(100):
     test_scenarios.append((p1, p2, p3))
 
 # ── 3. Plot ───────────────────────────────────────────────────────────────────
-fig = plt.figure(figsize=(10, 8))
+fig = plt.figure(figsize=(10,8))
 ax = fig.add_subplot(111, projection='3d')
+
+plt.subplots_adjust(bottom=0.28)
+
+init_lr = 0.1
+init_noise = 0.0
 
 for p1, p2, p3 in test_scenarios:
     history = simulate_mixed_game(p1, p2, p3, payoff_matrix_p1, payoff_matrix_p2, payoff_matrix_p3)
@@ -273,6 +279,158 @@ if vertices:
     separatrix.set_label('Data-Driven Separatrix')
     ax.add_collection3d(separatrix)
 
+
+def redraw_simulation(val=None):
+
+    ax.clear()
+
+    lr = slider_lr.val
+    noise = slider_noise.val
+
+    try:
+        m1 = eval(text_p1.text)
+        m2 = eval(text_p2.text)
+        m3 = eval(text_p3.text)
+    except Exception:
+        m1 = payoff_matrix_p1
+        m2 = payoff_matrix_p2
+        m3 = payoff_matrix_p3
+
+    # recompute separatrix
+    np.random.seed(42)
+    random.seed(42)
+
+    A_sep, B_sep, C_sep, D_sep, _ = compute_separatrix_plane(
+        m1,
+        m2,
+        m3,
+        n_probes=250,
+        bisection_steps=15,
+        learning_rate=lr,
+        iters=2000
+    )
+
+    for p1, p2, p3 in test_scenarios:
+
+        history = simulate_mixed_game(
+            p1,
+            p2,
+            p3,
+            m1,
+            m2,
+            m3,
+            learning_rate=lr,
+            noise_level=noise
+        )
+
+        xs = [h[0] for h in history]
+        ys = [h[1] for h in history]
+        zs = [h[2] for h in history]
+
+        ax.plot(xs, ys, zs,
+                color="navy",
+                linewidth=1,
+                alpha=0.6)
+
+        ax.scatter(
+            p1,
+            p2,
+            p3,
+            color="black",
+            s=15
+        )
+
+    vertices = calculate_plane_polygon(A_sep, B_sep, C_sep, D_sep)
+
+    if vertices:
+        plane = Poly3DCollection(
+            [vertices],
+            alpha=0.35,
+            facecolors="mediumseagreen",
+            edgecolors="darkgreen",
+            linewidths=1.5
+        )
+        plane.set_label("Separatrix")
+        ax.add_collection3d(plane)
+
+    ax.scatter(
+        [0.5],
+        [0.5],
+        [0.5],
+        color="red",
+        s=50,
+        label="Unstable Equilibrium"
+    )
+
+    ax.set_xlim(0,1)
+    ax.set_ylim(0,1)
+    ax.set_zlim(0,1)
+
+    ax.set_xlabel("Player 1 confidence (MWU)")
+    ax.set_ylabel("Player 2 confidence (PGD)")
+    ax.set_zlabel("Player 3 confidence (PGD)")
+
+    ax.set_title("Mixed Learning Dynamics")
+
+    ax.view_init(elev=25, azim=-45)
+
+    ax.legend()
+
+    fig.canvas.draw_idle()
+
+ax_lr = plt.axes([0.25,0.16,0.60,0.025])
+ax_noise = plt.axes([0.25,0.12,0.60,0.025])
+
+slider_lr = Slider(
+    ax_lr,
+    "Learning Rate",
+    0.01,
+    1.0,
+    valinit=init_lr,
+    valstep=0.01
+)
+
+slider_noise = Slider(
+    ax_noise,
+    "Noise",
+    0.0,
+    1.0,
+    valinit=init_noise,
+    valstep=0.01
+)
+
+ax_p1 = plt.axes([0.05,0.03,0.25,0.05])
+ax_p2 = plt.axes([0.37,0.03,0.25,0.05])
+ax_p3 = plt.axes([0.69,0.03,0.25,0.05])
+
+text_p1 = TextBox(
+    ax_p1,
+    "P1",
+    initial=str(payoff_matrix_p1)
+)
+
+text_p2 = TextBox(
+    ax_p2,
+    "P2",
+    initial=str(payoff_matrix_p2)
+)
+
+text_p3 = TextBox(
+    ax_p3,
+    "P3",
+    initial=str(payoff_matrix_p3)
+)
+
+slider_lr.on_changed(redraw_simulation)
+slider_noise.on_changed(redraw_simulation)
+
+text_p1.on_submit(redraw_simulation)
+text_p2.on_submit(redraw_simulation)
+text_p3.on_submit(redraw_simulation)
+
+redraw_simulation()
+
+plt.show()
 
 ax.set_xlabel("Player 1 confidence (MWU)")
 ax.set_ylabel("Player 2 confidence (PGD)")
