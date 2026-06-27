@@ -406,8 +406,6 @@ text_p3.on_submit(redraw_simulation)
 
 redraw_simulation()
 
-plt.show()
-
 ax.set_xlabel("Player 1 confidence (MWU)")
 ax.set_ylabel("Player 2 confidence (PGD)")
 ax.set_zlabel("Player 3 confidence (PGD)")
