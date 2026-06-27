@@ -1,12 +1,13 @@
 import math
 import random
 import matplotlib.pyplot as plt
+from matplotlib.widgets import Slider
 
 from mwu_sim import mwu_step
 from pgd_sim import pgd_step
 
 
-def run_mixed_simulation(p1_start, p2_start, payoff_matrix_p1, payoff_matrix_p2, iterations=1000, noise=0.2):
+def run_mixed_simulation(p1_start, p2_start, payoff_matrix_p1, payoff_matrix_p2, iterations=1000, learning_rate = 0.1, noise=0.2):
 
     # Initialize Player 1 (MWU) internal log-scores
     p1_score_A = math.log(p1_start)
@@ -18,7 +19,7 @@ def run_mixed_simulation(p1_start, p2_start, payoff_matrix_p1, payoff_matrix_p2,
     history = []
 
     for i in range(iterations):
-        learning_speed = 0.1 / math.sqrt(i + 1)
+        learning_speed = learning_rate / math.sqrt(i + 1)
 
         # Calculate P1's current probability before updating states
         denom = math.exp(p1_score_A) + math.exp(p1_score_B)
@@ -34,14 +35,24 @@ def run_mixed_simulation(p1_start, p2_start, payoff_matrix_p1, payoff_matrix_p2,
         noise_B_2 = random.uniform(0, noise)
 
         # 1. Compute PGD's next move based on MWU's current confidence
-        next_p2_conf = pgd_step(p2_conf, p1_conf, learning_speed, payoff_matrix_p2, noise_A_2,noise_B_2)
+        p2_conf = pgd_step(
+            p2_conf,
+            p1_conf,
+            learning_speed,
+            payoff_matrix_p2,
+            noise_A_2,
+            noise_B_2,
+        )
 
-        # 2. Compute MWU's next scores based on PGD's current confidence
-        next_p1_score_A, next_p1_score_B = mwu_step(p1_score_A, p1_score_B, p2_conf, learning_speed, payoff_matrix_p1, noise_A_1, noise_B_1)
-
-        p2_conf = next_p2_conf
-        p1_score_A = next_p1_score_A
-        p1_score_B = next_p1_score_B
+        p1_score_A, p1_score_B = mwu_step(
+            p1_score_A,
+            p1_score_B,
+            p2_conf,
+            learning_speed,
+            payoff_matrix_p1,
+            noise_A_1,
+            noise_B_1,
+        )
 
     return history
 
@@ -57,7 +68,72 @@ for i in range(100):
     test_scenarios.append((p1, p2))
 
 # Plotting Loop
-plt.figure(figsize=(8, 8))
+
+fig, ax = plt.subplots(figsize=(8,8))
+plt.subplots_adjust(bottom=0.28)
+
+init_lr = 0.1
+init_noise = 0.2
+
+def redraw_simulation(val=None):
+
+    ax.clear()
+
+    lr = slider_lr.val
+    noise = slider_noise.val
+
+    for p1, p2 in test_scenarios:
+
+        history = run_mixed_simulation(
+            p1,
+            p2,
+            payoff_matrix_p1,
+            payoff_matrix_p2,
+            learning_rate=lr,
+            noise=noise
+        )
+
+        xs = [h[0] for h in history]
+        ys = [h[1] for h in history]
+
+        ax.plot(xs, ys, color="navy", linewidth=1, alpha=0.6)
+        ax.scatter(p1, p2, color="black", s=15)
+
+    a = payoff_matrix_p1[0][0]
+    b = payoff_matrix_p2[1][1]
+
+    gradient = -(a+b)/math.sqrt(a*b)
+    c = b/(a+b)
+
+    line_x = [0,1]
+    line_y = [gradient*(x-c)+c for x in line_x]
+
+    ax.plot(
+        line_x,
+        line_y,
+        "r--",
+        linewidth=2,
+        label=f"Separatrix ({gradient:.2f})"
+    )
+
+    ax.scatter(
+        [0.5],
+        [0.5],
+        color="red",
+        s=40,
+        label="Unstable Equilibrium"
+    )
+
+    ax.set_xlim(0,1)
+    ax.set_ylim(0,1)
+
+    ax.set_xlabel("Player 1 confidence in A (MWU)")
+    ax.set_ylabel("Player 2 confidence in A (PGD)")
+    ax.set_title("Coordination Game: MWU vs PGD")
+    ax.grid(True)
+    ax.legend()
+
+    fig.canvas.draw_idle()
 
 payoff_matrix_p1 = [
     [1, 0],
@@ -109,7 +185,36 @@ print(
 # Highlight center unstable Nash Equilibrium
 plt.scatter([0.5], [0.5], color='red', s=40, zorder=4, label="Unstable Equilibrium")
 
-plt.grid(True)
-plt.legend()
 
+ax_lr = plt.axes([0.25,0.14,0.60,0.03])
+ax_noise = plt.axes([0.25,0.08,0.60,0.03])
+
+slider_lr = Slider(
+    ax_lr,
+    "Learning Rate",
+    0.01,
+    1.0,
+    valinit=init_lr,
+    valstep=0.01
+)
+
+slider_noise = Slider(
+    ax_noise,
+    "Noise",
+    0.0,
+    1.0,
+    valinit=init_noise,
+    valstep=0.01
+)
+
+slider_lr.on_changed(redraw_simulation)
+slider_noise.on_changed(redraw_simulation)
+
+
+
+
+
+plt.grid(True)
+
+redraw_simulation()
 plt.show()
