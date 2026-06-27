@@ -5,90 +5,66 @@ import numpy as np
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from matplotlib.widgets import Slider, TextBox
 
-def simulate_mixed_game(
-    p1_start_chance,
-    p2_start_chance,
-    p3_start_chance,
-    matrix_p1,
-    matrix_p2,
-    matrix_p3,
-    learning_rate=0.1,
-    iterations=1000,
-    noise_level=0
-):
-    # --- PLAYER 1 (MWU) INITIALIZATION ---
-    p1_start_chance = max(0.001, min(0.999, p1_start_chance))
+
+def simulate_mwu_3players(p1_start_chance, p2_start_chance, p3_start_chance, matrix_p1, matrix_p2, matrix_p3, learning_rate=0.1, iterations=1000, noise_level=0.1):
+
+    # Init scores
     p1_score_A = math.log(p1_start_chance)
     p1_score_B = math.log(1 - p1_start_chance)
 
-    # --- PLAYER 2 & 3 (PGD) INITIALIZATION ---
-    p2_confidence_A = p2_start_chance
-    p3_confidence_A = p3_start_chance
+    p2_score_A = math.log(p2_start_chance)
+    p2_score_B = math.log(1 - p2_start_chance)
+
+    p3_score_A = math.log(p3_start_chance)
+    p3_score_B = math.log(1 - p3_start_chance)
 
     plot_history = []
 
     for i in range(iterations):
+        # Robbins-Monro step size
         learning_speed = learning_rate / math.sqrt(i + 1)
 
-        # MWU probabilities (Player 1)
-        try:
-            denom1 = math.exp(p1_score_A) + math.exp(p1_score_B)
-            p1_confidence_A = math.exp(p1_score_A) / denom1
-        except OverflowError:
-            max_score = max(p1_score_A, p1_score_B)
-            denom1 = math.exp(p1_score_A - max_score) + math.exp(p1_score_B - max_score)
-            p1_confidence_A = math.exp(p1_score_A - max_score) / denom1
-
+        # Confidence p1
+        denom1 = math.exp(p1_score_A) + math.exp(p1_score_B)
+        p1_confidence_A = math.exp(p1_score_A) / denom1
         p1_confidence_B = 1 - p1_confidence_A
 
-        # PGD probabilities
+        # Confidence p2
+        denom2 = math.exp(p2_score_A) + math.exp(p2_score_B)
+        p2_confidence_A = math.exp(p2_score_A) / denom2
         p2_confidence_B = 1 - p2_confidence_A
+
+        # Confidence p3
+        denom3 = math.exp(p3_score_A) + math.exp(p3_score_B)
+        p3_confidence_A = math.exp(p3_score_A) / denom3
         p3_confidence_B = 1 - p3_confidence_A
 
         plot_history.append((p1_confidence_A, p2_confidence_A, p3_confidence_A))
 
-        reward_1_A = (
-            p2_confidence_A * matrix_p1[0][0] + p2_confidence_B * matrix_p1[0][1] +
-            p3_confidence_A * matrix_p1[0][0] + p3_confidence_B * matrix_p1[0][1]
-        )
-        reward_1_B = (
-            p2_confidence_A * matrix_p1[1][0] + p2_confidence_B * matrix_p1[1][1] +
-            p3_confidence_A * matrix_p1[1][0] + p3_confidence_B * matrix_p1[1][1]
-        )
-        reward_2_A = (
-            p1_confidence_A * matrix_p2[0][0] + p1_confidence_B * matrix_p2[0][1] +
-            p3_confidence_A * matrix_p2[0][0] + p3_confidence_B * matrix_p2[0][1]
-        )
-        reward_2_B = (
-            p1_confidence_A * matrix_p2[1][0] + p1_confidence_B * matrix_p2[1][1] +
-            p3_confidence_A * matrix_p2[1][0] + p3_confidence_B * matrix_p2[1][1]
-        )
-        reward_3_A = (
-            p1_confidence_A * matrix_p3[0][0] + p1_confidence_B * matrix_p3[0][1] +
-            p2_confidence_A * matrix_p3[0][0] + p2_confidence_B * matrix_p3[0][1]
-        )
-        reward_3_B = (
-            p1_confidence_A * matrix_p3[1][0] + p1_confidence_B * matrix_p3[1][1] +
-            p2_confidence_A * matrix_p3[1][0] + p2_confidence_B * matrix_p3[1][1]
-        )
+        reward_1_A = (p2_confidence_A + p3_confidence_A) * matrix_p1[0][0] + (p2_confidence_B + p3_confidence_B) * matrix_p1[0][1]
+        reward_1_B = (p2_confidence_A + p3_confidence_A) * matrix_p1[1][0] + (p2_confidence_B + p3_confidence_B) * matrix_p1[1][1]
 
-        if noise_level > 0:
-            reward_1_A += random.uniform(-noise_level, noise_level)
-            reward_1_B += random.uniform(-noise_level, noise_level)
-            reward_2_A += random.uniform(-noise_level, noise_level)
-            reward_2_B += random.uniform(-noise_level, noise_level)
-            reward_3_A += random.uniform(-noise_level, noise_level)
-            reward_3_B += random.uniform(-noise_level, noise_level)
+        reward_2_A = (p1_confidence_A + p3_confidence_A) * matrix_p2[0][0] + (p1_confidence_B + p3_confidence_B) * matrix_p2[0][1]
+        reward_2_B = (p1_confidence_A + p3_confidence_A) * matrix_p2[1][0] + (p1_confidence_B + p3_confidence_B) * matrix_p2[1][1]
 
-        # Player 1 (MWU Score Update)
+        reward_3_A = (p1_confidence_A + p2_confidence_A) * matrix_p3[0][0] + (p1_confidence_B + p2_confidence_B) * matrix_p3[0][1]
+        reward_3_B = (p1_confidence_A + p2_confidence_A) * matrix_p3[1][0] + (p1_confidence_B + p2_confidence_B) * matrix_p3[1][1]
+
+        reward_1_A += random.uniform(-noise_level, noise_level)
+        reward_1_B += random.uniform(-noise_level, noise_level)
+        reward_2_A += random.uniform(-noise_level, noise_level)
+        reward_2_B += random.uniform(-noise_level, noise_level)
+        reward_3_A += random.uniform(-noise_level, noise_level)
+        reward_3_B += random.uniform(-noise_level, noise_level)
+
         p1_score_A += learning_speed * reward_1_A
         p1_score_B += learning_speed * reward_1_B
 
-        p2_confidence_A += learning_speed * (reward_2_A - reward_2_B)
-        p2_confidence_A = max(0, min(1, p2_confidence_A))
+        p2_score_A += learning_speed * reward_2_A
+        p2_score_B += learning_speed * reward_2_B
 
-        p3_confidence_A += learning_speed * (reward_3_A - reward_3_B)
-        p3_confidence_A = max(0, min(1, p3_confidence_A))
+        p3_score_A += learning_speed * reward_3_A
+        p3_score_B += learning_speed * reward_3_B
 
     return plot_history
 
@@ -112,7 +88,7 @@ def compute_separatrix_plane(matrix_p1, matrix_p2, matrix_p3,
     and the array of boundary points used for fitting.
     """
     def final_state(p1, p2, p3):
-        hist = simulate_mixed_game(p1, p2, p3, matrix_p1, matrix_p2, matrix_p3,
+        hist = simulate_mwu_3players(p1, p2, p3, matrix_p1, matrix_p2, matrix_p3,
                                    learning_rate=learning_rate, iterations=iters,
                                    noise_level=0.0)
         return hist[-1]
@@ -257,7 +233,7 @@ init_lr = 0.1
 init_noise = 0.0
 
 for p1, p2, p3 in test_scenarios:
-    history = simulate_mixed_game(p1, p2, p3, payoff_matrix_p1, payoff_matrix_p2, payoff_matrix_p3)
+    history = simulate_mwu_3players(p1, p2, p3, payoff_matrix_p1, payoff_matrix_p2, payoff_matrix_p3)
     x = [h[0] for h in history]
     y = [h[1] for h in history]
     z = [h[2] for h in history]
@@ -312,7 +288,7 @@ def redraw_simulation(val=None):
 
     for p1, p2, p3 in test_scenarios:
 
-        history = simulate_mixed_game(
+        history = simulate_mwu_3players(
             p1,
             p2,
             p3,
