@@ -65,59 +65,6 @@ payoff_matrix_p2 = [
     [0, 1]
 ]
 
-a = payoff_matrix_p1[0][0]
-b = payoff_matrix_p2[1][1]
-gradient = -(a+b) / math.sqrt(a*b)
-
-c = b/ (a+b)
-
-line_x = [0.0, 1.0]
-line_y = [gradient * (x - c) + c for x in line_x]
-plt.plot(line_x, line_y, color="purple", linestyle="--", linewidth=2.5, zorder=4,
-         label=f"Straight Separatrix (Slope: {gradient:.2f})")
-
-
-
-# --- FIXED ANALYTICAL CURVED SEPARATRIX FORMULA ---
-a11, a22 = payoff_matrix_p1[0][0], payoff_matrix_p1[1][1]
-b11, b22 = payoff_matrix_p2[0][0], payoff_matrix_p2[1][1]
-
-# Calculate exact saddle point coordinates
-x_star = b22 / (b11 + b22)
-y_star = a22 / (a11 + a22)
-
-# Compute energy constant C at the saddle point
-C = 0.5 * (a11 + a22) * (y_star ** 2) - a22 * y_star + b22 * math.log(x_star) + b11 * math.log(1 - x_star)
-
-quad_coeff = 0.5 * (a11 + a22)
-print("=" * 60)
-print("EXACT ANALYTICAL SEPARATRIX EQUATION:")
-print(f"{quad_coeff:.1f}y^2 - {a22:.1f}y + {b22:.1f}ln(x) + {b11:.1f}ln(1-x) = {C:.4f}")
-print("=" * 60)
-
-# Reconstruct the curve by solving the quadratic equation for y over a grid of x
-curve_x = []
-curve_y = []
-
-for idx in range(1, 1000):
-    x = idx / 1000.0
-    c_x = b22 * math.log(x) + b11 * math.log(1 - x) - C
-    discriminant = (a22 ** 2) - 2 * (a11 + a22) * c_x
-
-    if discriminant >= 0:
-        if x <= x_star:
-            y = (a22 + math.sqrt(discriminant)) / (a11 + a22)
-        else:
-            y = (a22 - math.sqrt(discriminant)) / (a11 + a22)
-
-        if 0 <= y <= 1:
-            curve_x.append(x)
-            curve_y.append(y)
-
-plt.plot(curve_x, curve_y, color="red", linestyle="--", linewidth=2.5, zorder=4,
-         label="True Curved Separatrix")
-
-
 for p1, p2 in test_scenarios:
     history = run_mixed_simulation(p1, p2, payoff_matrix_p1, payoff_matrix_p2)
 
@@ -142,5 +89,56 @@ plt.scatter([0.5], [0.5], color='red', s=40, zorder=4, label="Unstable Equilibri
 
 plt.grid(True)
 plt.legend()
+
+
+def check_convergence_destination(p1_start, p2_start):
+    history = run_mixed_simulation(p1_start, p2_start, payoff_matrix_p1, payoff_matrix_p2, iterations=200, noise=0)
+    final_p1, final_p2 = history[-1]
+
+    # Return 1 if it goes to the top-right, 0 if it goes to the bottom-left
+    if final_p1 > 0.5 and final_p2 > 0.5:
+        return 1
+    return 0
+
+
+def find_separatrix_y(p1_coordinate, tolerance=1e-5):
+    """Uses binary search to find the precise y-boundary for a given x."""
+    low_y = 0.0
+    high_y = 1.0
+
+    while (high_y - low_y) > tolerance:
+        mid_y = (low_y + high_y) / 2
+        destination = check_convergence_destination(p1_coordinate, mid_y)
+
+        # If it went to (1,1), the boundary is lower down
+        if destination == 1:
+            high_y = mid_y
+        # If it went to (0,0), the boundary is higher up
+        else:
+            low_y = mid_y
+
+    return (low_y + high_y) / 2
+
+# Step 1: Find the y-boundary at x = 0.4
+x1 = 0.4
+y1 = find_separatrix_y(x1)
+
+# Step 2: Find the y-boundary at x = 0.6
+x2 = 0.6
+y2 = find_separatrix_y(x2)
+
+# Step 3: Compute Gradient (m = change in y / change in x)
+gradient = (y2 - y1) / (x2 - x1)
+
+print(f"Point 1 on Separatrix: ({x1}, {y1:.5f})")
+print(f"Point 2 on Separatrix: ({x2}, {y2:.5f})")
+print(f"Calculated Gradient (Slope) of the line: {gradient:.4f}")
+
+
+line_x = [0.0, 1.0]
+line_y = [gradient * (x - 0.5) + 0.5 for x in line_x]
+plt.plot(line_x, line_y, color="red", linestyle="--", linewidth=2, zorder=4,
+         label=f"Straight Separatrix (Slope: {gradient:.2f})")
+
 
 plt.show()
