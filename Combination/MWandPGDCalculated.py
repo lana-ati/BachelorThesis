@@ -5,7 +5,7 @@ from mwu_sim import mwu_step
 from pgd_sim import pgd_step
 
 
-def run_mixed_simulation(p1_start, p2_start, payoff_matrix_p1, payoff_matrix_p2, iterations=1000, noise = 0.2, ):
+def run_mixed_simulation(p1_start, p2_start, payoff_matrix_p1, payoff_matrix_p2, iterations=1000, noise = 0.2 ):
     # Initialize Player 1 (MWU) internal log-scores
     p1_score_A = math.log(p1_start)
     p1_score_B = math.log(1 - p1_start)
@@ -65,6 +65,14 @@ payoff_matrix_p2 = [
     [0, 1]
 ]
 
+a1 = payoff_matrix_p1[0][0]
+b1 = payoff_matrix_p1[1][1]
+a2 = payoff_matrix_p2[0][0]
+b2 = payoff_matrix_p2[1][1]
+
+cx = b2 / (a2 + b2)
+cy = b1 / (a1 + b1)
+
 for p1, p2 in test_scenarios:
     history = run_mixed_simulation(p1, p2, payoff_matrix_p1, payoff_matrix_p2)
 
@@ -85,7 +93,7 @@ plt.xlim(-0.01, 1.01)
 plt.ylim(-0.01, 1.01)
 
 # Highlight center unstable Nash Equilibrium
-plt.scatter([0.5], [0.5], color='red', s=40, zorder=4, label="Unstable Equilibrium")
+plt.scatter([cx], [cy], color='red', s=40, zorder=4, label="Unstable Equilibrium")
 
 plt.grid(True)
 plt.legend()
@@ -119,15 +127,13 @@ def find_separatrix_y(p1_coordinate, tolerance=1e-5):
 
     return (low_y + high_y) / 2
 
-# Step 1: Find the y-boundary at x = 0.4
-x1 = 0.4
-y1 = find_separatrix_y(x1)
+x1 = cx + 0.1
+x2 = cx - 0.1
 
-# Step 2: Find the y-boundary at x = 0.6
-x2 = 0.6
+y1 = find_separatrix_y(x1)
 y2 = find_separatrix_y(x2)
 
-# Step 3: Compute Gradient (m = change in y / change in x)
+# Compute Gradient
 gradient = (y2 - y1) / (x2 - x1)
 
 print(f"Point 1 on Separatrix: ({x1}, {y1:.5f})")
@@ -136,7 +142,7 @@ print(f"Calculated Gradient (Slope) of the line: {gradient:.4f}")
 
 
 line_x = [0.0, 1.0]
-line_y = [gradient * (x - 0.5) + 0.5 for x in line_x]
+line_y = [gradient * (x - cx) + cy for x in line_x]
 plt.plot(line_x, line_y, color="red", linestyle="--", linewidth=2, zorder=4,
          label=f"Straight Separatrix (Slope: {gradient:.2f})")
 

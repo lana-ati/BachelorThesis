@@ -67,7 +67,7 @@ for i in range(100):
     p2 = random.uniform(0.01, 0.99)
     test_scenarios.append((p1, p2))
 
-# Plotting Loop
+test_scenarios.append((0.5, 0.5))
 
 fig, ax = plt.subplots(figsize=(8,8))
 plt.subplots_adjust(bottom=0.28)
@@ -75,15 +75,31 @@ plt.subplots_adjust(bottom=0.28)
 init_lr = 0.1
 init_noise = 0.2
 
-def redraw_simulation(val=None):
+payoff_matrix_p1 = [
+    [1, 0],
+    [0, 1]
+]
 
+payoff_matrix_p2 = [
+    [1, 0],
+    [0, 1]
+]
+
+
+def redraw_simulation(val=None):
     ax.clear()
 
     lr = slider_lr.val
     noise = slider_noise.val
 
-    for p1, p2 in test_scenarios:
+    try:
+        payoff_matrix_p1 = eval(text_p1.text)
+        payoff_matrix_p2 = eval(text_p2.text)
+    except Exception:
+        payoff_matrix_p1 = payoff_matrix_p1
+        payoff_matrix_p2 = payoff_matrix_p2
 
+    for p1, p2 in test_scenarios:
         history = run_mixed_simulation(
             p1,
             p2,
@@ -99,96 +115,64 @@ def redraw_simulation(val=None):
         ax.plot(xs, ys, color="navy", linewidth=1, alpha=0.6)
         ax.scatter(p1, p2, color="black", s=15)
 
-    a = payoff_matrix_p1[0][0]
-    b = payoff_matrix_p2[1][1]
+    a1 = payoff_matrix_p1[0][0]
+    b1 = payoff_matrix_p1[1][1]
+    a2 = payoff_matrix_p2[0][0]
+    b2 = payoff_matrix_p2[1][1]
 
-    gradient = -(a+b)/math.sqrt(a*b)
-    c = b/(a+b)
+    cx = b2 / (a2 + b2)
+    cy = b1 / (a1 + b1)
 
-    line_x = [0,1]
-    line_y = [gradient*(x-c)+c for x in line_x]
+    # Calculate exact non-linear separatrix from the conserved quantity
+    def D(x):
+        return b2 * math.log(x) + a2 * math.log(1 - x)
+
+    D_cx = D(cx)
+    line_x = [i / 1000.0 for i in range(1, 1000)]
+    line_y = []
+
+    for x in line_x:
+        val = -2 * (a1 + b1) * (D(x) - D_cx)
+        val = max(0, val)  # Clamp near 0 to avoid float precision issues
+        sq = math.sqrt(val)
+
+        # Plot stable manifold: positive root for x < cx, negative for x > cx
+        if x <= cx:
+            y = (b1 + sq) / (a1 + b1)
+        else:
+            y = (b1 - sq) / (a1 + b1)
+        line_y.append(y)
 
     ax.plot(
         line_x,
         line_y,
         "r--",
         linewidth=2,
-        label=f"Separatrix ({gradient:.2f})"
+        label="Exact Separatrix"
     )
 
     ax.scatter(
-        [0.5],
-        [0.5],
+        [cx],
+        [cy],
         color="red",
         s=40,
         label="Unstable Equilibrium"
     )
 
-    ax.set_xlim(0,1)
-    ax.set_ylim(0,1)
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
 
     ax.set_xlabel("Player 1 confidence in A (MWU)")
     ax.set_ylabel("Player 2 confidence in A (PGD)")
     ax.set_title("Coordination Game: MWU vs PGD")
     ax.grid(True)
-    ax.legend()
+    ax.legend(loc="upper right")
 
     fig.canvas.draw_idle()
-
-payoff_matrix_p1 = [
-    [1, 0],
-    [0, 1]
-]
-
-payoff_matrix_p2 = [
-    [1, 0],
-    [0, 1]
-]
-
-
-for p1, p2 in test_scenarios:
-    history = run_mixed_simulation(p1, p2, payoff_matrix_p1, payoff_matrix_p2)
-
-    x_coords = [h[0] for h in history]
-    y_coords = [h[1] for h in history]
-
-    # Draw the trajectory line
-    plt.plot(x_coords, y_coords, color="navy", linewidth=1, alpha=0.6)
-    # Mark the initial starting point
-    plt.scatter(p1, p2, color='black', s=15, zorder=3)
-
-# Formatting the chart
-plt.xlabel("Player 1 confidence in A (MWU)")
-plt.ylabel("Player 2 confidence in A (PGD)")
-plt.title("Coordination Game: Asymmetric Dynamics (MWU vs PGD)")
-
-a = payoff_matrix_p1[0][0]
-b = payoff_matrix_p2[1][1]
-gradient = -(a+b) / math.sqrt(a*b)
-
-c = b/ (a+b)
-
-line_x = [0.0, 1.0]
-line_y = [gradient * (x - c) + c for x in line_x]
-plt.plot(line_x, line_y, color="red", linestyle="--", linewidth=2, zorder=4,
-         label=f"Straight Separatrix (Slope: {gradient:.2f})")
-
-plt.xlim(-0.01, 1.01)
-plt.ylim(-0.01, 1.01)
-
-intercept = c - gradient * c
-
-print(
-    f"{gradient:.4f}x - 1.0000y = {-intercept:.4f}"
-)
-
-# Highlight center unstable Nash Equilibrium
-plt.scatter([0.5], [0.5], color='red', s=40, zorder=4, label="Unstable Equilibrium")
 
 
 ax_lr = plt.axes([0.25, 0.20, 0.65, 0.03])
 ax_noise = plt.axes([0.25, 0.15, 0.65, 0.03])
-
 
 slider_lr = Slider(
     ax_lr,
@@ -216,12 +200,8 @@ text_p2 = TextBox(ax_p2, 'P2 Matrix ', initial=str(payoff_matrix_p2))
 
 slider_lr.on_changed(redraw_simulation)
 slider_noise.on_changed(redraw_simulation)
-
-
-
-
-
-plt.grid(True)
+text_p1.on_submit(redraw_simulation)
+text_p2.on_submit(redraw_simulation)
 
 redraw_simulation()
 plt.show()
