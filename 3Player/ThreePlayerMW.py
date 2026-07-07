@@ -41,14 +41,33 @@ def simulate_mwu_3players(p1_start_chance, p2_start_chance, p3_start_chance, mat
 
         plot_history.append((p1_confidence_A, p2_confidence_A, p3_confidence_A))
 
-        reward_1_A = (p2_confidence_A + p3_confidence_A) * matrix_p1[0][0] + (p2_confidence_B + p3_confidence_B) * matrix_p1[0][1]
-        reward_1_B = (p2_confidence_A + p3_confidence_A) * matrix_p1[1][0] + (p2_confidence_B + p3_confidence_B) * matrix_p1[1][1]
+        # True 3-player joint distribution mapping using the 2x2 matrix constraints
+        reward_1_A = (
+            p2_confidence_A * p3_confidence_A * matrix_p1[0][0] +
+            (p2_confidence_A * p3_confidence_B + p2_confidence_B * p3_confidence_A + p2_confidence_B * p3_confidence_B) * matrix_p1[0][1]
+        )
+        reward_1_B = (
+            (p2_confidence_A * p3_confidence_A + p2_confidence_A * p3_confidence_B + p2_confidence_B * p3_confidence_A) * matrix_p1[1][0] +
+            p2_confidence_B * p3_confidence_B * matrix_p1[1][1]
+        )
 
-        reward_2_A = (p1_confidence_A + p3_confidence_A) * matrix_p2[0][0] + (p1_confidence_B + p3_confidence_B) * matrix_p2[0][1]
-        reward_2_B = (p1_confidence_A + p3_confidence_A) * matrix_p2[1][0] + (p1_confidence_B + p3_confidence_B) * matrix_p2[1][1]
+        reward_2_A = (
+            p1_confidence_A * p3_confidence_A * matrix_p2[0][0] +
+            (p1_confidence_A * p3_confidence_B + p1_confidence_B * p3_confidence_A + p1_confidence_B * p3_confidence_B) * matrix_p2[0][1]
+        )
+        reward_2_B = (
+            (p1_confidence_A * p3_confidence_A + p1_confidence_A * p3_confidence_B + p1_confidence_B * p3_confidence_A) * matrix_p2[1][0] +
+            p1_confidence_B * p3_confidence_B * matrix_p2[1][1]
+        )
 
-        reward_3_A = (p1_confidence_A + p2_confidence_A) * matrix_p3[0][0] + (p1_confidence_B + p2_confidence_B) * matrix_p3[0][1]
-        reward_3_B = (p1_confidence_A + p2_confidence_A) * matrix_p3[1][0] + (p1_confidence_B + p2_confidence_B) * matrix_p3[1][1]
+        reward_3_A = (
+            p1_confidence_A * p2_confidence_A * matrix_p3[0][0] +
+            (p1_confidence_A * p2_confidence_B + p1_confidence_B * p2_confidence_A + p1_confidence_B * p2_confidence_B) * matrix_p3[0][1]
+        )
+        reward_3_B = (
+            (p1_confidence_A * p2_confidence_A + p1_confidence_A * p2_confidence_B + p1_confidence_B * p2_confidence_A) * matrix_p3[1][0] +
+            p1_confidence_B * p2_confidence_B * matrix_p3[1][1]
+        )
 
         reward_1_A += random.uniform(-noise_level, noise_level)
         reward_1_B += random.uniform(-noise_level, noise_level)
@@ -70,23 +89,13 @@ def simulate_mwu_3players(p1_start_chance, p2_start_chance, p3_start_chance, mat
 
 
 def detect_attractor(final_state, threshold=0.5):
-    """Returns True if the trajectory converged to the A-attractor (1,1,1)."""
-    return sum(final_state) > 3 * threshold
+    """Returns True if ALL individual players converged past the threshold."""
+    return all(p > threshold for p in final_state)
 
 
 def compute_separatrix_plane(matrix_p1, matrix_p2, matrix_p3,
                               n_probes=300, bisection_steps=15,
                               learning_rate=0.1, iters=2000):
-    """
-    Empirically locates the separatrix by:
-      1. Sampling random pairs of starting conditions in opposite basins.
-      2. Binary-searching (bisecting) along the line between each pair to find
-         the exact basin boundary point.
-      3. Fitting a best-fit plane through all boundary points via SVD.
-
-    Returns (A, B, C, D) coefficients of the plane Ax + By + Cz = D,
-    and the array of boundary points used for fitting.
-    """
     def final_state(p1, p2, p3):
         hist = simulate_mwu_3players(p1, p2, p3, matrix_p1, matrix_p2, matrix_p3,
                                    learning_rate=learning_rate, iterations=iters,
@@ -105,7 +114,7 @@ def compute_separatrix_plane(matrix_p1, matrix_p2, matrix_p3,
         ba = in_basin_A(a)
         bb = in_basin_A(b)
         if ba == bb:
-            continue  # Same basin — no boundary crossing on this segment
+            continue
 
         # Bisect to find the precise boundary crossing
         lo, hi = a.copy(), b.copy()

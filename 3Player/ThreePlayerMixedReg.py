@@ -50,49 +50,55 @@ def simulate_mixed_game(
         plot_history.append((p1_confidence_A, p2_confidence_A, p3_confidence_A))
 
         # =========================================================
-        # REWARD BLOCK (NOW MATRIX-BASED, NO HARD-CODING)
+        # REWARD BLOCK (CORRECTED TO TRUE 3-PLAYER JOINT OUTCOMES)
         # =========================================================
 
+        # Player 1 plays A (0): Payoff relies on joint choice of P2 and P3
         reward_1_A = (
-            p2_confidence_A * matrix_p1[0][0] +
-            p2_confidence_B * matrix_p1[0][1] +
-            p3_confidence_A * matrix_p1[0][0] +
-            p3_confidence_B * matrix_p1[0][1]
+            p2_confidence_A * p3_confidence_A * matrix_p1[0][0] +
+            p2_confidence_A * p3_confidence_B * matrix_p1[0][1] +
+            p2_confidence_B * p3_confidence_A * matrix_p1[0][1] +
+            p2_confidence_B * p3_confidence_B * matrix_p1[0][1]
         )
 
+        # Player 1 plays B (1)
         reward_1_B = (
-            p2_confidence_A * matrix_p1[1][0] +
-            p2_confidence_B * matrix_p1[1][1] +
-            p3_confidence_A * matrix_p1[1][0] +
-            p3_confidence_B * matrix_p1[1][1]
+            p2_confidence_A * p3_confidence_A * matrix_p1[1][0] +
+            p2_confidence_A * p3_confidence_B * matrix_p1[1][0] +
+            p2_confidence_B * p3_confidence_A * matrix_p1[1][0] +
+            p2_confidence_B * p3_confidence_B * matrix_p1[1][1]
         )
 
+        # Player 2 plays A (0): Payoff relies on joint choice of P1 and P3
         reward_2_A = (
-            p1_confidence_A * matrix_p2[0][0] +
-            p1_confidence_B * matrix_p2[0][1] +
-            p3_confidence_A * matrix_p2[0][0] +
-            p3_confidence_B * matrix_p2[0][1]
+            p1_confidence_A * p3_confidence_A * matrix_p2[0][0] +
+            p1_confidence_A * p3_confidence_B * matrix_p2[0][1] +
+            p1_confidence_B * p3_confidence_A * matrix_p2[0][1] +
+            p1_confidence_B * p3_confidence_B * matrix_p2[0][1]
         )
 
+        # Player 2 plays B (1)
         reward_2_B = (
-            p1_confidence_A * matrix_p2[1][0] +
-            p1_confidence_B * matrix_p2[1][1] +
-            p3_confidence_A * matrix_p2[1][0] +
-            p3_confidence_B * matrix_p2[1][1]
+            p1_confidence_A * p3_confidence_A * matrix_p2[1][0] +
+            p1_confidence_A * p3_confidence_B * matrix_p2[1][0] +
+            p1_confidence_B * p3_confidence_A * matrix_p2[1][0] +
+            p1_confidence_B * p3_confidence_B * matrix_p2[1][1]
         )
 
+        # Player 3 plays A (0): Payoff relies on joint choice of P1 and P2
         reward_3_A = (
-            p1_confidence_A * matrix_p3[0][0] +
-            p1_confidence_B * matrix_p3[0][1] +
-            p2_confidence_A * matrix_p3[0][0] +
-            p2_confidence_B * matrix_p3[0][1]
+            p1_confidence_A * p2_confidence_A * matrix_p3[0][0] +
+            p1_confidence_A * p2_confidence_B * matrix_p3[0][1] +
+            p1_confidence_B * p2_confidence_A * matrix_p3[0][1] +
+            p1_confidence_B * p2_confidence_B * matrix_p3[0][1]
         )
 
+        # Player 3 plays B (1)
         reward_3_B = (
-            p1_confidence_A * matrix_p3[1][0] +
-            p1_confidence_B * matrix_p3[1][1] +
-            p2_confidence_A * matrix_p3[1][0] +
-            p2_confidence_B * matrix_p3[1][1]
+            p1_confidence_A * p2_confidence_A * matrix_p3[1][0] +
+            p1_confidence_A * p2_confidence_B * matrix_p3[1][0] +
+            p1_confidence_B * p2_confidence_A * matrix_p3[1][0] +
+            p1_confidence_B * p2_confidence_B * matrix_p3[1][1]
         )
 
         # Noise
@@ -118,8 +124,8 @@ def simulate_mixed_game(
 
 
 def detect_attractor(final_state, threshold=0.5):
-    """Returns True if the trajectory converged to the A-attractor (1,1,1)."""
-    return sum(final_state) > 3 * threshold
+    """Returns True if ALL individual players converged past the threshold to the A-attractor."""
+    return all(p > threshold for p in final_state)
 
 
 def compute_separatrix_plane(matrix_p1, matrix_p2, matrix_p3,
@@ -245,7 +251,7 @@ def calculate_plane_polygon(A, B, C, D):
 # ─────────────────────────────────────────────────────────────────────────────
 
 payoff_matrix_p1 = [[1, 0],
-                    [0, 1]]
+                    [0.5, 1]]
 payoff_matrix_p2 = payoff_matrix_p1
 payoff_matrix_p3 = payoff_matrix_p1
 
