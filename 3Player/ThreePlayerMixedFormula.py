@@ -7,22 +7,23 @@ from matplotlib.widgets import Slider, TextBox
 
 
 def simulate_mixed_game(
-        p1_start_chance,
-        p2_start_chance,
-        p3_start_chance,
-        matrix_p1,
-        matrix_p2,
-        matrix_p3,
-        learning_rate=0.1,
-        iterations=1000,
-        noise_level=0.1
+    p1_start_chance,
+    p2_start_chance,
+    p3_start_chance,
+    matrix_p1,
+    matrix_p2,
+    matrix_p3,
+    learning_rate=0.1,
+    iterations=1000,
+    noise_level = 0.1
 ):
-    # Player 1 (MW)
+
+    # --- PLAYER 1 (MWU) INITIALIZATION ---
     p1_start_chance = max(0.001, min(0.999, p1_start_chance))
     p1_score_A = math.log(p1_start_chance)
     p1_score_B = math.log(1 - p1_start_chance)
 
-    # Player 2 and 3 (PGD)
+    # --- PLAYER 2 & 3 (PGD) INITIALIZATION ---
     p2_confidence_A = p2_start_chance
     p3_confidence_A = p3_start_chance
 
@@ -48,21 +49,57 @@ def simulate_mixed_game(
 
         plot_history.append((p1_confidence_A, p2_confidence_A, p3_confidence_A))
 
+        # =========================================================
+        # REWARD BLOCK (CORRECTED TO TRUE 3-PLAYER JOINT OUTCOMES)
+        # =========================================================
 
-        reward_1_A = p2_confidence_A * matrix_p1[0][0] + p2_confidence_B * matrix_p1[0][1] + p3_confidence_A * \
-                     matrix_p1[0][0] + p3_confidence_B * matrix_p1[0][1]
-        reward_1_B = p2_confidence_A * matrix_p1[1][0] + p2_confidence_B * matrix_p1[1][1] + p3_confidence_A * \
-                     matrix_p1[1][0] + p3_confidence_B * matrix_p1[1][1]
+        # Player 1 plays A (0): Payoff relies on joint choice of P2 and P3
+        reward_1_A = (
+            p2_confidence_A * p3_confidence_A * matrix_p1[0][0] +
+            p2_confidence_A * p3_confidence_B * matrix_p1[0][1] +
+            p2_confidence_B * p3_confidence_A * matrix_p1[0][1] +
+            p2_confidence_B * p3_confidence_B * matrix_p1[0][1]
+        )
 
-        reward_2_A = p1_confidence_A * matrix_p2[0][0] + p1_confidence_B * matrix_p2[0][1] + p3_confidence_A * \
-                     matrix_p2[0][0] + p3_confidence_B * matrix_p2[0][1]
-        reward_2_B = p1_confidence_A * matrix_p2[1][0] + p1_confidence_B * matrix_p2[1][1] + p3_confidence_A * \
-                     matrix_p2[1][0] + p3_confidence_B * matrix_p2[1][1]
+        # Player 1 plays B (1)
+        reward_1_B = (
+            p2_confidence_A * p3_confidence_A * matrix_p1[1][0] +
+            p2_confidence_A * p3_confidence_B * matrix_p1[1][0] +
+            p2_confidence_B * p3_confidence_A * matrix_p1[1][0] +
+            p2_confidence_B * p3_confidence_B * matrix_p1[1][1]
+        )
 
-        reward_3_A = p1_confidence_A * matrix_p3[0][0] + p1_confidence_B * matrix_p3[0][1] + p2_confidence_A * \
-                     matrix_p3[0][0] + p2_confidence_B * matrix_p3[0][1]
-        reward_3_B = p1_confidence_A * matrix_p3[1][0] + p1_confidence_B * matrix_p3[1][1] + p2_confidence_A * \
-                     matrix_p3[1][0] + p2_confidence_B * matrix_p3[1][1]
+        # Player 2 plays A (0): Payoff relies on joint choice of P1 and P3
+        reward_2_A = (
+            p1_confidence_A * p3_confidence_A * matrix_p2[0][0] +
+            p1_confidence_A * p3_confidence_B * matrix_p2[0][1] +
+            p1_confidence_B * p3_confidence_A * matrix_p2[0][1] +
+            p1_confidence_B * p3_confidence_B * matrix_p2[0][1]
+        )
+
+        # Player 2 plays B (1)
+        reward_2_B = (
+            p1_confidence_A * p3_confidence_A * matrix_p2[1][0] +
+            p1_confidence_A * p3_confidence_B * matrix_p2[1][0] +
+            p1_confidence_B * p3_confidence_A * matrix_p2[1][0] +
+            p1_confidence_B * p3_confidence_B * matrix_p2[1][1]
+        )
+
+        # Player 3 plays A (0): Payoff relies on joint choice of P1 and P2
+        reward_3_A = (
+            p1_confidence_A * p2_confidence_A * matrix_p3[0][0] +
+            p1_confidence_A * p2_confidence_B * matrix_p3[0][1] +
+            p1_confidence_B * p2_confidence_A * matrix_p3[0][1] +
+            p1_confidence_B * p2_confidence_B * matrix_p3[0][1]
+        )
+
+        # Player 3 plays B (1)
+        reward_3_B = (
+            p1_confidence_A * p2_confidence_A * matrix_p3[1][0] +
+            p1_confidence_A * p2_confidence_B * matrix_p3[1][0] +
+            p1_confidence_B * p2_confidence_A * matrix_p3[1][0] +
+            p1_confidence_B * p2_confidence_B * matrix_p3[1][1]
+        )
 
         # Noise
         reward_1_A += random.uniform(-noise_level, noise_level)
@@ -72,7 +109,8 @@ def simulate_mixed_game(
         reward_3_A += random.uniform(-noise_level, noise_level)
         reward_3_B += random.uniform(-noise_level, noise_level)
 
-        # Strategy Updates
+        # 5. Perform Strategy Updates
+        # Player 1 (MWU Score Update)
         p1_score_A += learning_speed * reward_1_A
         p1_score_B += learning_speed * reward_1_B
 
