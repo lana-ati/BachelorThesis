@@ -25,14 +25,33 @@ def simulate_pgd(p1_start_chance, p2_start_chance, p3_start_chance, matrix_p1, m
 
         plot_history.append((p1_confidence_A, p2_confidence_A, p3_confidence_A))
 
-        reward_1_A = (p2_confidence_A * p3_confidence_A) * matrix_p1[0][0] + (p2_confidence_B * p3_confidence_B) * matrix_p1[0][1]
-        reward_1_B = (p2_confidence_A * p3_confidence_A) * matrix_p1[1][0] + (p2_confidence_B * p3_confidence_B) * matrix_p1[1][1]
+        # True 3-player joint distribution mapping using the 2x2 matrix constraints
+        reward_1_A = (
+            p2_confidence_A * p3_confidence_A * matrix_p1[0][0] +
+            (p2_confidence_A * p3_confidence_B + p2_confidence_B * p3_confidence_A + p2_confidence_B * p3_confidence_B) * matrix_p1[0][1]
+        )
+        reward_1_B = (
+            (p2_confidence_A * p3_confidence_A + p2_confidence_A * p3_confidence_B + p2_confidence_B * p3_confidence_A) * matrix_p1[1][0] +
+            p2_confidence_B * p3_confidence_B * matrix_p1[1][1]
+        )
 
-        reward_2_A = (p1_confidence_A * p3_confidence_A) * matrix_p2[0][0] + (p1_confidence_B * p3_confidence_B) * matrix_p2[0][1]
-        reward_2_B = (p1_confidence_A * p3_confidence_A) * matrix_p2[1][0] + (p1_confidence_B * p3_confidence_B) * matrix_p2[1][1]
+        reward_2_A = (
+            p1_confidence_A * p3_confidence_A * matrix_p2[0][0] +
+            (p1_confidence_A * p3_confidence_B + p1_confidence_B * p3_confidence_A + p1_confidence_B * p3_confidence_B) * matrix_p2[0][1]
+        )
+        reward_2_B = (
+            (p1_confidence_A * p3_confidence_A + p1_confidence_A * p3_confidence_B + p1_confidence_B * p3_confidence_A) * matrix_p2[1][0] +
+            p1_confidence_B * p3_confidence_B * matrix_p2[1][1]
+        )
 
-        reward_3_A = (p1_confidence_A * p2_confidence_A) * matrix_p3[0][0] + (p1_confidence_B * p2_confidence_B) * matrix_p3[0][1]
-        reward_3_B = (p1_confidence_A * p2_confidence_A) * matrix_p3[1][0] + (p1_confidence_B * p2_confidence_B) * matrix_p3[1][1]
+        reward_3_A = (
+            p1_confidence_A * p2_confidence_A * matrix_p3[0][0] +
+            (p1_confidence_A * p2_confidence_B + p1_confidence_B * p2_confidence_A + p1_confidence_B * p2_confidence_B) * matrix_p3[0][1]
+        )
+        reward_3_B = (
+            (p1_confidence_A * p2_confidence_A + p1_confidence_A * p2_confidence_B + p1_confidence_B * p2_confidence_A) * matrix_p3[1][0] +
+            p1_confidence_B * p2_confidence_B * matrix_p3[1][1]
+        )
 
         # Noise
         reward_1_A += random.uniform(-noise_level, noise_level)
@@ -69,7 +88,7 @@ payoff_matrix_p3 = payoff_matrix_p1
 
 # Generate random 3D test scenarios
 test_scenarios = []
-for i in range(40):
+for i in range(100):
     p1 = random.uniform(0, 1)
     p2 = random.uniform(0, 1)
     p3 = random.uniform(0, 1)
@@ -132,7 +151,8 @@ def calculate_plane_polygon(A, B, C, D):
                     points.append([x, y, z])
 
     unique_points = np.unique(np.round(points, 5), axis=0)
-
+    if len(unique_points) < 3:
+        return []
     centroid = np.mean(unique_points, axis=0)
 
     normal = np.array([A, B, C])
@@ -156,7 +176,7 @@ def calculate_plane_polygon(A, B, C, D):
 
 
 def detect_attractor(final_state, threshold=0.5):
-    return sum(final_state) > 3 * threshold
+    return all(p > threshold for p in final_state)
 
 
 def compute_separatrix_plane(matrix_p1, matrix_p2, matrix_p3,
@@ -213,11 +233,7 @@ def compute_separatrix_plane(matrix_p1, matrix_p2, matrix_p3,
     normal = Vt[-1]
 
     D = np.dot(normal, centroid)
-
-    A, B, C = normal
-
-    return A, B, C, D, pts
-
+    return normal[0], normal[1], normal[2], D, pts
 
 
 print("Computing empirical separatrix...")
