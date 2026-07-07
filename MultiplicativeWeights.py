@@ -114,13 +114,13 @@ def redraw_simulation(val=None):
         history = simulate_mwu(p1, p2, m1, m2, learning_rate=lr, noise_level=noise)
         x = [h[0] for h in history]
         y = [h[1] for h in history]
-        ax.plot(x, y, color="navy", linewidth=1, alpha=0.7)
+        ax.plot(x, y, color="navy", linewidth=0.7, alpha=0.7)
         ax.scatter(p1, p2, color='black', s=15, zorder=3)
 
     # Plot formatting
     ax.set_xlabel("Player 1 confidence in A")
     ax.set_ylabel("Player 2 confidence in A")
-    ax.set_title("Coordination Game (Projected Gradient Descent)")
+    ax.set_title("Coordination Game (Multiplicative Weights)")
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.scatter([0.5], [0.5], color='red', s=40, zorder=4)
