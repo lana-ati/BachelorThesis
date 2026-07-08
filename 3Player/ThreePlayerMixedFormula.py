@@ -17,7 +17,6 @@ def simulate_mixed_game(
     iterations=1000,
     noise_level = 0.1
 ):
-
     # --- PLAYER 1 (MWU) INITIALIZATION ---
     p1_start_chance = max(0.001, min(0.999, p1_start_chance))
     p1_score_A = math.log(p1_start_chance)
@@ -123,36 +122,64 @@ def simulate_mixed_game(
     return plot_history
 
 
-def compute_theoretical_separatrix_plane(matrix_p1):
+def compute_theoretical_separatrix_plane(m1, m2, m3):
     """
     Directly computes the analytical plane coefficients Ax + By + Cz = D
     using the stable manifold left-eigenspace formulas.
     """
-    a = matrix_p1[0][0]
-    b = matrix_p1[1][1]
+    # Defensive bound extraction to prevent division by zero or negative sqrt
+    a1, b1 = max(1e-5, m1[0][0]), max(1e-5, m1[1][1])
+    a2, b2 = max(1e-5, m2[0][0]), max(1e-5, m2[1][1])
+    a3, b3 = max(1e-5, m3[0][0]), max(1e-5, m3[1][1])
 
-    S = a + b
-    # Dominant unstable eigenvalue from characteristic polynomial
-    lambda_2 = (S + math.sqrt(S ** 2 + 8 * a * b)) / 2.0
+    # Calculate exact asymmetric fixed point coordinates
+    X = math.sqrt((a1 * b2 * b3) / (b1 * a2 * a3))
+    Y = math.sqrt((b1 * a2 * b3) / (a1 * b2 * a3))
+    Z = math.sqrt((b1 * b2 * a3) / (a1 * a2 * b3))
 
-    # Left eigenvector components
-    A = 2 * S
-    B = lambda_2
-    C = lambda_2
+    x_eq = X / (1.0 + X)
+    y_eq = Y / (1.0 + Y)
+    z_eq = Z / (1.0 + Z)
 
-    # Pivot plane around the interior mixed equilibrium saddle point (p, p, p)
-    p = b / S
-    D = A * p + B * p + C * p
+    # Populate Jacobian matrix entries based on system derivatives
+    M12 = x_eq * (1.0 - x_eq) * (a1 * z_eq + b1 * (1.0 - z_eq))
+    M13 = x_eq * (1.0 - x_eq) * (a1 * y_eq + b1 * (1.0 - y_eq))
+    M21 = a2 * z_eq + b2 * (1.0 - z_eq)
+    M23 = a2 * x_eq + b2 * (1.0 - x_eq)
+    M31 = a3 * y_eq + b3 * (1.0 - y_eq)
+    M32 = a3 * x_eq + b3 * (1.0 - x_eq)
 
-    print(f"Calculated Theoretical Plane: {A:.4f}x + {B:.4f}y + {C:.4f}z = {D:.4f}")
-    return A, B, C, D
+    J = np.array([
+        [0.0, M12, M13],
+        [M21, 0.0, M23],
+        [M31, M32, 0.0]
+    ])
+
+    # Left eigenvectors of J are right eigenvectors of J transposed
+    eigenvalues, eigenvectors = np.linalg.eig(J.T)
+
+    # Find the single real positive (unstable) eigenvalue pushing away from the separatrix
+    real_pos_indices = np.where((eigenvalues.real > 0) & (np.abs(eigenvalues.imag) < 1e-5))[0]
+
+    if len(real_pos_indices) > 0:
+        idx = real_pos_indices[0]
+    else:
+        idx = np.argmax(eigenvalues.real)  # Fallback to largest real component
+
+    v = eigenvectors[:, idx].real
+    A, B, C = v[0], v[1], v[2]
+
+    # Standardize orientation direction
+    if A < 0:
+        A, B, C = -A, -B, -C
+
+    D = A * x_eq + B * y_eq + C * z_eq
+
+    print(f"Calculated Asymmetric Plane: {A:.4f}x + {B:.4f}y + {C:.4f}z = {D:.4f}")
+    return A, B, C, D, x_eq, y_eq, z_eq
 
 
 def calculate_plane_polygon(A, B, C, D):
-    """
-    Finds intersection vertices of the plane Ax + By + Cz = D
-    with the unit cube bounds [0,1]^3.
-    """
     points = []
     for y in [0, 1]:
         for z in [0, 1]:
@@ -193,7 +220,9 @@ payoff_matrix_p3 = payoff_matrix_p1
 
 # 1. Instantly calculate analytical coefficients
 print("Evaluating system eigenvalues...")
-A_th, B_th, C_th, D_th = compute_theoretical_separatrix_plane(payoff_matrix_p1)
+A_th, B_th, C_th, D_th, x_eq, y_eq, z_eq = compute_theoretical_separatrix_plane(
+    payoff_matrix_p1, payoff_matrix_p2, payoff_matrix_p3
+)
 
 # 2. Generate random starting conditions for visualization
 random.seed(42)
@@ -216,11 +245,9 @@ for p1, p2, p3 in test_scenarios:
     ax.plot(x, y, z, color="navy", linewidth=1, alpha=0.4)
     ax.scatter(p1, p2, p3, color='black', s=10, zorder=3)
 
-# Internal fixed point
-p_eq = payoff_matrix_p1[1][1] / (payoff_matrix_p1[0][0] + payoff_matrix_p1[1][1])
-ax.scatter([p_eq], [p_eq], [p_eq], color='red', s=60, zorder=5, label='Saddle Equilibrium')
+# Real asymmetric interior fixed point
+ax.scatter([x_eq], [y_eq], [z_eq], color='red', s=60, zorder=5, label='Saddle Equilibrium')
 
-# Generate and render the theoretical plane slice
 vertices_th = calculate_plane_polygon(A_th, B_th, C_th, D_th)
 if vertices_th:
     separatrix_th = Poly3DCollection(
@@ -253,7 +280,7 @@ def redraw_simulation(val=None):
     np.random.seed(42)
     random.seed(42)
 
-    A_sep, B_sep, C_sep, D_sep = compute_theoretical_separatrix_plane(payoff_matrix_p1)
+    A_sep, B_sep, C_sep, D_sep, x_eq_curr, y_eq_curr, z_eq_curr = compute_theoretical_separatrix_plane(m1, m2, m3)
 
     for p1, p2, p3 in test_scenarios:
 
@@ -299,12 +326,8 @@ def redraw_simulation(val=None):
         ax.add_collection3d(plane)
 
     ax.scatter(
-        [0.5],
-        [0.5],
-        [0.5],
-        color="red",
-        s=50,
-        label="Unstable Equilibrium"
+        [x_eq_curr], [y_eq_curr], [z_eq_curr],
+        color="red", s=50, label="Unstable Equilibrium"
     )
 
     ax.set_xlim(0,1)
@@ -376,13 +399,5 @@ text_p3.on_submit(redraw_simulation)
 redraw_simulation()
 
 
-ax.set_xlabel("Player 1 confidence (MWU)")
-ax.set_ylabel("Player 2 confidence (PGD)")
-ax.set_zlabel("Player 3 confidence (PGD)")
-ax.set_xlim(0, 1)
-ax.set_ylim(0, 1)
-ax.set_zlim(0, 1)
-ax.view_init(elev=25, azim=-45)
-ax.legend()
 plt.grid(True)
 plt.show()
