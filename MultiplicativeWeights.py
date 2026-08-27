@@ -3,7 +3,7 @@ import random
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, TextBox
 
-def simulate_mwu(p1_start_chance, p2_start_chance, payoff_matrix_p1, payoff_matrix_p2, learning_rate=0.1, noise_level = 0.2, iterations=1000):
+def simulate_mwu(p1_start_chance, p2_start_chance, payoff_matrix_p1, payoff_matrix_p2, learning_rate=0.1, noise_level = 0.2, iterations=5000):
 
     #init scores
     p1_score_A = math.log(p1_start_chance)
@@ -87,11 +87,29 @@ payoff_matrix_p2 = [
     [1, 0],
     [0, 1]
 ]
+def mixed_equilibrium(matrix_p1, matrix_p2):
+    a1, b1 = matrix_p1[0]
+    c1, d1 = matrix_p1[1]
+
+    a2, b2 = matrix_p2[0]
+    c2, d2 = matrix_p2[1]
+
+    denom1 = a2 - b2 - c2 + d2
+    denom2 = a1 - b1 - c1 + d1
+
+    if abs(denom1) < 1e-12 or abs(denom2) < 1e-12:
+        return None
+
+    p1 = (d2 - c2) / denom1
+    p2 = (d1 - b1) / denom2
+
+    return p1, p2
+
+
 
 #Graphics!
-fig, ax = plt.subplots()
+fig, ax = plt.subplots(figsize=(8, 8))
 plt.subplots_adjust(bottom=0.35, left=0.25)
-
 
 def redraw_simulation(val=None):
     """Clears the axes and redraws the simulation trajectories based on current UI values."""
@@ -114,19 +132,69 @@ def redraw_simulation(val=None):
         history = simulate_mwu(p1, p2, m1, m2, learning_rate=lr, noise_level=noise)
         x = [h[0] for h in history]
         y = [h[1] for h in history]
-        ax.plot(x, y, color="navy", linewidth=0.7, alpha=0.7)
+        ax.plot(x, y, color="navy", linewidth=1, alpha=0.6)
         ax.scatter(p1, p2, color='black', s=15, zorder=3)
 
     # Plot formatting
     ax.set_xlabel("Player 1 confidence in A")
     ax.set_ylabel("Player 2 confidence in A")
     ax.set_title("Coordination Game (Multiplicative Weights)")
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, 1)
-    ax.scatter([0.5], [0.5], color='red', s=40, zorder=4)
+    ax.set_xlim(-0.01, 1.01)
+    ax.set_ylim(-0.01, 1.01)
+    ax.set_aspect('equal', adjustable='box')
+    c = mixed_equilibrium(m1, m2)
+
+    if c is not None:
+        c1, c2 = c
+
+        # plot equilibrium
+        ax.scatter(c1, c2, color="red", s=40, zorder=4,
+                   label="Unstable Equilibrium")
+
+        # separatrix with slope -1 through c
+        x_sep = [0, 1]
+        y_sep = [(c1 + c2) - x for x in x_sep]
+
+        ax.plot(
+            x_sep,
+            y_sep,
+            color="red",
+            linestyle="--",
+            linewidth=2,
+            label="Separatrix"
+        )
     ax.grid(True)
     fig.canvas.draw_idle()
 
+    # Count convergence destinations
+    converged_A = 0
+    converged_B = 0
+
+    for p1, p2 in test_scenarios:
+        history = simulate_mwu(
+            p1, p2,
+            m1, m2,
+            learning_rate=lr,
+            noise_level=0,  # deterministic basin measurement
+            iterations=5000
+        )
+
+        final_p1, final_p2 = history[-1]
+
+        # (1,1) equilibrium = A
+        if final_p1 > 0.5 and final_p2 > 0.5:
+            converged_A += 1
+        # (0,0) equilibrium = B
+        elif final_p1 < 0.5 and final_p2 < 0.5:
+            converged_B += 1
+
+    total = len(test_scenarios)
+
+    percentage_A = (converged_A / total) * 100
+    percentage_B = (converged_B / total) * 100
+
+    print(f"Convergence to A (1,1): {converged_A}/{total} ({percentage_A:.2f}%)")
+    print(f"Convergence to B (0,0): {converged_B}/{total} ({percentage_B:.2f}%)")
 
 # UI Layout controls
 
@@ -152,4 +220,8 @@ text_p2.on_submit(redraw_simulation)
 # Initial draw
 redraw_simulation()
 
+
+
+
+ax.legend()
 plt.show()

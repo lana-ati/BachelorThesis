@@ -5,7 +5,7 @@ from mwu_sim import mwu_step
 from pgd_sim import pgd_step
 
 
-def run_mixed_simulation(p1_start, p2_start, payoff_matrix_p1, payoff_matrix_p2, iterations=1000, noise = 0.2 ):
+def run_mixed_simulation(p1_start, p2_start, payoff_matrix_p1, payoff_matrix_p2, iterations=1000, noise = 1 ):
     # Initialize Player 1 (MWU) internal log-scores
     p1_score_A = math.log(p1_start)
     p1_score_B = math.log(1 - p1_start)
@@ -73,6 +73,35 @@ b2 = payoff_matrix_p2[1][1]
 cx = b2 / (a2 + b2)
 cy = b1 / (a1 + b1)
 
+
+def D(x):
+    return b2 * math.log(x) + a2 * math.log(1 - x)
+
+
+D_cx = D(cx)
+line_x = [i / 1000.0 for i in range(1, 1000)]
+line_y = []
+
+for x in line_x:
+    val = -2 * (a1 + b1) * (D(x) - D_cx)
+    val = max(0, val)  # Clamp near 0 to avoid float precision issues
+    sq = math.sqrt(val)
+
+    # Plot stable manifold: positive root for x < cx, negative for x > cx
+    if x <= cx:
+        y = (b1 + sq) / (a1 + b1)
+    else:
+        y = (b1 - sq) / (a1 + b1)
+    line_y.append(y)
+
+plt.plot(
+    line_x,
+    line_y,
+    "r--",
+    linewidth=2,
+    label="Exact Separatrix"
+)
+
 for p1, p2 in test_scenarios:
     history = run_mixed_simulation(p1, p2, payoff_matrix_p1, payoff_matrix_p2)
 
@@ -87,7 +116,7 @@ for p1, p2 in test_scenarios:
 # Formatting the chart
 plt.xlabel("Player 1 confidence in A (MWU)")
 plt.ylabel("Player 2 confidence in A (PGD)")
-plt.title("Coordination Game: Asymmetric Dynamics (MWU vs PGD)")
+plt.title("Coordination Game: Symmetric Dynamics with Noise (MWU vs PGD)")
 
 plt.xlim(-0.01, 1.01)
 plt.ylim(-0.01, 1.01)
@@ -96,7 +125,6 @@ plt.ylim(-0.01, 1.01)
 plt.scatter([cx], [cy], color='red', s=40, zorder=4, label="Unstable Equilibrium")
 
 plt.grid(True)
-plt.legend()
 
 
 def check_convergence_destination(p1_start, p2_start):
@@ -143,8 +171,31 @@ print(f"Calculated Gradient (Slope) of the line: {gradient:.4f}")
 
 line_x = [0.0, 1.0]
 line_y = [gradient * (x - cx) + cy for x in line_x]
-plt.plot(line_x, line_y, color="red", linestyle="--", linewidth=2, zorder=4,
-         label=f"Straight Separatrix (Slope: {gradient:.2f})")
+plt.plot(line_x, line_y, color="darkred", linestyle="--", linewidth=2, zorder=4,
+         label=f"Numerical (Slope: {gradient:.2f})")
 
+
+# Count convergence destinations
+converged_A = 0
+converged_B = 0
+
+for p1, p2 in test_scenarios:
+    destination = check_convergence_destination(p1, p2)
+
+    if destination == 1:
+        converged_A += 1  # (1,1) equilibrium
+    else:
+        converged_B += 1  # (0,0) equilibrium
+
+total_trajectories = len(test_scenarios)
+
+percentage_A = (converged_A / total_trajectories) * 100
+percentage_B = (converged_B / total_trajectories) * 100
+
+print(f"Trajectories converging to A (1,1): {converged_A}/{total_trajectories} "
+      f"({percentage_A:.2f}%)")
+print(f"Trajectories converging to B (0,0): {converged_B}/{total_trajectories} "
+      f"({percentage_B:.2f}%)")
+plt.legend()
 
 plt.show()

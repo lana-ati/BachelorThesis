@@ -143,6 +143,11 @@ def redraw_simulation(val=None):
             y = (b1 - sq) / (a1 + b1)
         line_y.append(y)
 
+    C = b2 * math.log(cx) + a2 * math.log(1 - cx)
+
+    print(
+        f"y = ({b1} ± sqrt(-2*({a1 + b1})*({b2}*ln(x) + {a2}*ln(1-x) - {C:.6f}))) / ({a1 + b1})"
+    )
     ax.plot(
         line_x,
         line_y,

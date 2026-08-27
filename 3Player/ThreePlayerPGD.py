@@ -122,9 +122,16 @@ plt.title("3-Player Coordination Game using Projected Gradient Descent")
 ax.set_xlim(0, 1)
 ax.set_ylim(0, 1)
 ax.set_zlim(0, 1)
+a1 = payoff_matrix_p1[0][0]
+b1 = payoff_matrix_p1[1][1]
+a2 = payoff_matrix_p2[0][0]
+b2 = payoff_matrix_p2[1][1]
+
+cx = b2 / (a2 + b2)
+cy = b1 / (a1 + b1)
 
 # Unstable equilibrium point at the center (0.5, 0.5, 0.5)
-ax.scatter([0.5], [0.5], [0.5], color='red', s=50)
+plt.scatter([cx], [cy], color='red', s=40, zorder=4, label="Unstable Equilibrium")
 
 def calculate_plane_polygon(A, B, C, D):
     points = []
@@ -358,10 +365,12 @@ def redraw_simulation(val=None):
         plane.set_label("Separatrix")
         ax.add_collection3d(plane)
 
+    x_star = math.sqrt(2) / (1 + math.sqrt(2))
+
     ax.scatter(
-        [0.5],
-        [0.5],
-        [0.5],
+        [x_star],
+        [x_star],
+        [x_star],
         color="red",
         s=50,
         label="Unstable Equilibrium"
@@ -371,16 +380,47 @@ def redraw_simulation(val=None):
     ax.set_ylim(0,1)
     ax.set_zlim(0,1)
 
-    ax.set_xlabel("Player 1 confidence (MWU)")
-    ax.set_ylabel("Player 2 confidence (PGD)")
-    ax.set_zlabel("Player 3 confidence (PGD)")
+    ax.set_xlabel("Player 1 confidence in A")
+    ax.set_ylabel("Player 2 confidence in A")
+    ax.set_zlabel("Player 3 confidence in A")
 
-    ax.set_title("Mixed Learning Dynamics")
+    ax.set_title("PGD")
 
     ax.view_init(elev=25, azim=-45)
 
     ax.legend()
+    # Count convergence destinations
+    converged_A = 0
+    converged_B = 0
 
+    for p1, p2, p3 in test_scenarios:
+
+        history = simulate_pgd(
+            p1,
+            p2,
+            p3,
+            m1,
+            m2,
+            m3,
+            learning_rate=lr,
+            iterations=1000,
+            noise_level=0.0  # deterministic basin measurement
+        )
+
+        final_p1, final_p2, final_p3 = history[-1]
+
+        if final_p1 > 0.5 and final_p2 > 0.5 and final_p3 > 0.5:
+            converged_A += 1
+        elif final_p1 < 0.5 and final_p2 < 0.5 and final_p3 < 0.5:
+            converged_B += 1
+
+    total = len(test_scenarios)
+
+    percentage_A = 100 * converged_A / total
+    percentage_B = 100 * converged_B / total
+
+    print(f"Trajectories converging to A (1,1,1): {converged_A}/{total} ({percentage_A:.2f}%)")
+    print(f"Trajectories converging to B (0,0,0): {converged_B}/{total} ({percentage_B:.2f}%)")
     fig.canvas.draw_idle()
 
 ax_lr = plt.axes([0.25,0.16,0.60,0.025])

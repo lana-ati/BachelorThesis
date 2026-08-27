@@ -127,21 +127,15 @@ def compute_theoretical_separatrix_plane(m1, m2, m3):
     Directly computes the analytical plane coefficients Ax + By + Cz = D
     using the stable manifold left-eigenspace formulas.
     """
-    # Defensive bound extraction to prevent division by zero or negative sqrt
+
     a1, b1 = max(1e-5, m1[0][0]), max(1e-5, m1[1][1])
     a2, b2 = max(1e-5, m2[0][0]), max(1e-5, m2[1][1])
     a3, b3 = max(1e-5, m3[0][0]), max(1e-5, m3[1][1])
 
-    # Calculate exact asymmetric fixed point coordinates
-    X = math.sqrt((a1 * b2 * b3) / (b1 * a2 * a3))
-    Y = math.sqrt((b1 * a2 * b3) / (a1 * b2 * a3))
-    Z = math.sqrt((b1 * b2 * a3) / (a1 * a2 * b3))
+    x_eq = math.sqrt(b1) / (math.sqrt(a1) + math.sqrt(b1))
+    y_eq = math.sqrt(b2) / (math.sqrt(a2) + math.sqrt(b2))
+    z_eq = math.sqrt(b3) / (math.sqrt(a3) + math.sqrt(b3))
 
-    x_eq = X / (1.0 + X)
-    y_eq = Y / (1.0 + Y)
-    z_eq = Z / (1.0 + Z)
-
-    # Populate Jacobian matrix entries based on system derivatives
     M12 = x_eq * (1.0 - x_eq) * (a1 * z_eq + b1 * (1.0 - z_eq))
     M13 = x_eq * (1.0 - x_eq) * (a1 * y_eq + b1 * (1.0 - y_eq))
     M21 = a2 * z_eq + b2 * (1.0 - z_eq)
@@ -155,27 +149,29 @@ def compute_theoretical_separatrix_plane(m1, m2, m3):
         [M31, M32, 0.0]
     ])
 
-    # Left eigenvectors of J are right eigenvectors of J transposed
     eigenvalues, eigenvectors = np.linalg.eig(J.T)
 
-    # Find the single real positive (unstable) eigenvalue pushing away from the separatrix
-    real_pos_indices = np.where((eigenvalues.real > 0) & (np.abs(eigenvalues.imag) < 1e-5))[0]
+    real_pos_indices = np.where(
+        (eigenvalues.real > 0) &
+        (np.abs(eigenvalues.imag) < 1e-5)
+    )[0]
 
     if len(real_pos_indices) > 0:
         idx = real_pos_indices[0]
     else:
-        idx = np.argmax(eigenvalues.real)  # Fallback to largest real component
+        idx = np.argmax(eigenvalues.real)
 
     v = eigenvectors[:, idx].real
+
     A, B, C = v[0], v[1], v[2]
 
-    # Standardize orientation direction
     if A < 0:
         A, B, C = -A, -B, -C
 
     D = A * x_eq + B * y_eq + C * z_eq
 
-    print(f"Calculated Asymmetric Plane: {A:.4f}x + {B:.4f}y + {C:.4f}z = {D:.4f}")
+    print(f"Calculated Separatrix Plane: {A:.4f}x + {B:.4f}y + {C:.4f}z = {D:.4f}")
+
     return A, B, C, D, x_eq, y_eq, z_eq
 
 
@@ -214,8 +210,7 @@ def calculate_plane_polygon(A, B, C, D):
 
 payoff_matrix_p1 = [[1, 0],
                     [0, 1]]
-payoff_matrix_p2 = [[1, 0],
-                    [0, 1]]
+payoff_matrix_p2 = payoff_matrix_p1
 payoff_matrix_p3 = payoff_matrix_p1
 
 # 1. Instantly calculate analytical coefficients
@@ -226,15 +221,19 @@ A_th, B_th, C_th, D_th, x_eq, y_eq, z_eq = compute_theoretical_separatrix_plane(
 
 # 2. Generate random starting conditions for visualization
 random.seed(42)
-test_scenarios = [[random.uniform(0.01, 0.99) for _ in range(3)] for _ in range(100)]
-
+test_scenarios = []
+for i in range(100):
+    p1 = random.uniform(0, 1)
+    p2 = random.uniform(0, 1)
+    p3 = random.uniform(0, 1)
+    test_scenarios.append((p1, p2, p3))
 # 3. Plotting Setup
 fig = plt.figure(figsize=(10,8))
 ax = fig.add_subplot(111, projection='3d')
 
 plt.subplots_adjust(bottom=0.28)
 init_lr = 0.1
-init_noise = 0.0
+init_noise = 0.5
 
 print("Running trajectory simulations...")
 for p1, p2, p3 in test_scenarios:
@@ -343,7 +342,38 @@ def redraw_simulation(val=None):
     ax.view_init(elev=25, azim=-45)
 
     ax.legend()
+    # Count convergence destinations
+    converged_A = 0
+    converged_B = 0
 
+    for p1, p2, p3 in test_scenarios:
+
+        history = simulate_mixed_game(
+            p1,
+            p2,
+            p3,
+            m1,
+            m2,
+            m3,
+            learning_rate=lr,
+            iterations=1000,
+            noise_level=0.0  # deterministic basin measurement
+        )
+
+        final_p1, final_p2, final_p3 = history[-1]
+
+        if final_p1 > 0.5 and final_p2 > 0.5 and final_p3 > 0.5:
+            converged_A += 1
+        elif final_p1 < 0.5 and final_p2 < 0.5 and final_p3 < 0.5:
+            converged_B += 1
+
+    total = len(test_scenarios)
+
+    percentage_A = 100 * converged_A / total
+    percentage_B = 100 * converged_B / total
+
+    print(f"Trajectories converging to A (1,1,1): {converged_A}/{total} ({percentage_A:.2f}%)")
+    print(f"Trajectories converging to B (0,0,0): {converged_B}/{total} ({percentage_B:.2f}%)")
     fig.canvas.draw_idle()
 
 ax_lr = plt.axes([0.25,0.16,0.60,0.025])
